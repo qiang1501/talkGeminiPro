@@ -7,9 +7,9 @@ interface LivePreviewProps {
 export const LivePreview: React.FC<LivePreviewProps> = ({ transcript }) => {
   if (!transcript) return null;
   return (
-    <div className="live-preview panel">
-      <h3>🗣️ ライブ認識状況 (採点には不使用)</h3>
-      <p className="interim-text">{transcript}</p>
+    <div className="live-preview">
+      <div className="live-preview-title">🗣️ 認識中...</div>
+      <div className="interim-text">{transcript}</div>
     </div>
   );
 };

@@ -37,7 +37,7 @@ function App() {
 
   const handleFinalResult = useCallback((transcript: string) => {
     const { parsedLines: currentLines, currentLineIndex: lineIdx, isFinished: finished, lineResults: results } = stateRef.current;
-    if (finished || !currentLines) return;
+    if (finished || !currentLines || lineIdx >= currentLines.length) return;
     
     // 発声結果を形態素解析して単語リストとカタカナを取得
     const spokenLines = parseTextToLines(transcript);
@@ -95,7 +95,7 @@ function App() {
     setCurrentLineIndex(nextLineIdx);
 
     if (nextLineIdx >= currentLines.length) {
-      setIsFinished(true);
+      stop();
     }
   }, []);
 
@@ -128,6 +128,13 @@ function App() {
     setIsFinished(false);
   };
 
+  const handleRetry = () => {
+    stop();
+    setLineResults([]);
+    setCurrentLineIndex(0);
+    setIsFinished(false);
+  };
+
   // スコアの計算
   let totalScoreChars = 0;
   let correctScoreChars = 0;
@@ -153,10 +160,16 @@ function App() {
           <div className="karaoke-container panel">
             <h2>2. マイクボタンを押して1行ずつ読み上げてください</h2>
             <div className="controls">
-              {!isRecording ? (
-                <button className="btn-record start-btn" onClick={start}>🎤 録音開始</button>
+              {currentLineIndex < parsedLines.length ? (
+                <>
+                  {!isRecording ? (
+                    <button className="btn-record start-btn" onClick={start}>🎤 録音開始</button>
+                  ) : (
+                    <button className="btn-record stop-btn" onClick={stop}>🛑 録音停止</button>
+                  )}
+                </>
               ) : (
-                <button className="btn-record stop-btn" onClick={stop}>🛑 録音停止</button>
+                <div style={{fontWeight: 'bold', color: 'var(--neon-green)', marginRight: '15px', display: 'flex', alignItems: 'center', textShadow: '0 0 10px var(--neon-green)'}}>🎉 全ての行を読み終えました！</div>
               )}
               <button className="btn-secondary" onClick={handleReset}>キャンセル</button>
             </div>
@@ -172,6 +185,14 @@ function App() {
               ))}
             </div>
 
+            {currentLineIndex >= parsedLines.length && (
+              <div className="finish-action" style={{ textAlign: 'center', marginTop: '30px', paddingBottom: '10px' }}>
+                <button className="btn-primary" onClick={() => setIsFinished(true)} style={{ fontSize: '24px', padding: '15px 50px' }}>
+                  💯 採点する
+                </button>
+              </div>
+            )}
+
             <LivePreview transcript={interimTranscript} />
           </div>
         )}
@@ -181,6 +202,7 @@ function App() {
             totalChars={totalScoreChars} 
             correctChars={correctScoreChars} 
             onReset={handleReset} 
+            onRetry={handleRetry}
           />
         )}
       </main>

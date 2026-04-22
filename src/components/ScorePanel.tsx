@@ -4,9 +4,10 @@ interface ScoreProps {
   totalChars: number;
   correctChars: number;
   onReset: () => void;
+  onRetry: () => void;
 }
 
-export const ScorePanel: React.FC<ScoreProps> = ({ totalChars, correctChars, onReset }) => {
+export const ScorePanel: React.FC<ScoreProps> = ({ totalChars, correctChars, onReset, onRetry }) => {
   const rate = totalChars === 0 ? 0 : (correctChars / totalChars) * 100;
   
   return (
@@ -20,7 +21,10 @@ export const ScorePanel: React.FC<ScoreProps> = ({ totalChars, correctChars, onR
       <div className="final-score">
         <h3>スコア: <span>{Math.round(rate)}</span> 点</h3>
       </div>
-      <button className="btn-secondary" onClick={onReset}>もう一度最初から</button>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginTop: '20px' }}>
+        <button className="btn-primary" onClick={onRetry}>もう一度同じ文章でやり直す</button>
+        <button className="btn-secondary" onClick={onReset}>テキストを入力し直す</button>
+      </div>
     </div>
   );
 };
