@@ -7,7 +7,9 @@ let tokenizer: kuromoji.Tokenizer<kuromoji.IpadicFeatures> | null = null;
 export const buildTokenizer = (): Promise<void> => {
   return new Promise((resolve, reject) => {
     if (tokenizer) return resolve();
-    kuromoji.builder({ dicPath: '/dict' }).build((err, t) => {
+    // GitHub Pagesなどのサブディレクトリデプロイに対応するため、BASE_URLを付与
+    const dicPath = import.meta.env.BASE_URL + 'dict';
+    kuromoji.builder({ dicPath }).build((err, t) => {
       if (err) return reject(err);
       tokenizer = t;
       resolve();
