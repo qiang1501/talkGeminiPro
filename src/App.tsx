@@ -196,7 +196,7 @@ function App() {
 
   return (
     <div className="App">
-      <header className="header">
+      <header className="header" onClick={handleReset} style={{ cursor: 'pointer', userSelect: 'none' }}>
         <h1>🗣️ 日本語発音チェッカー</h1>
       </header>
       
