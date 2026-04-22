@@ -19,6 +19,11 @@ function App() {
   const [isFinished, setIsFinished] = useState(false);
   const [currentLineTranscript, setCurrentLineTranscript] = useState('');
   const [isUserRecording, setIsUserRecording] = useState(false);
+  const [isSparkling, setIsSparkling] = useState(false);
+  const [sparkleColor, setSparkleColor] = useState('var(--neon-blue)');
+  const lastTranscriptRef = useRef('');
+  const colorIndexRef = useRef(0);
+  const colors = ['var(--neon-blue)', 'var(--neon-pink)', 'var(--neon-green)', 'var(--neon-red)'];
 
   // We use a ref to hold the latest state because onFinalResult is a callback from the speech API listener
   const stateRef = useRef({ parsedLines, currentLineIndex, isFinished, lineResults, currentLineTranscript });
@@ -106,6 +111,20 @@ function App() {
   const { isRecording, interimTranscript, error: speechError, start, stop } = useSpeechRecognition({
     onFinalResult: handleFinalResult
   });
+
+  // interimTranscriptの更新を監視してキラキラエフェクトを発火させる
+  useEffect(() => {
+    if (interimTranscript !== lastTranscriptRef.current && interimTranscript !== '') {
+      const nextIndex = (colorIndexRef.current + 1) % colors.length;
+      colorIndexRef.current = nextIndex;
+      setSparkleColor(colors[nextIndex]);
+
+      setIsSparkling(true);
+      const timer = setTimeout(() => setIsSparkling(false), 200);
+      return () => clearTimeout(timer);
+    }
+    lastTranscriptRef.current = interimTranscript;
+  }, [interimTranscript]);
 
   // Watch for unexpected stops (e.g., timeout) and auto-restart if user still wants to record
   useEffect(() => {
@@ -216,6 +235,8 @@ function App() {
                   line={line} 
                   isActive={!isFinished && idx === currentLineIndex}
                   isRecording={isUserRecording && idx === currentLineIndex}
+                  isSparkling={isSparkling}
+                  sparkleColor={sparkleColor}
                   result={lineResults.find(r => r.lineIndex === idx)} 
                   onToggleRecord={toggleRecording}
                 />

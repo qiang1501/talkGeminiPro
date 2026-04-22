@@ -6,15 +6,20 @@ interface LineCompareProps {
   line: KaraokeLineData;
   isActive: boolean;
   isRecording: boolean;
+  isSparkling?: boolean;
+  sparkleColor?: string;
   result?: LineCompareResult;
   onToggleRecord: (lineIndex: number) => void;
 }
 
-export const LineCompare: React.FC<LineCompareProps> = ({ line, isActive, isRecording, result, onToggleRecord }) => {
+export const LineCompare: React.FC<LineCompareProps> = ({ line, isActive, isRecording, isSparkling, sparkleColor, result, onToggleRecord }) => {
   const isLineRecording = isActive && isRecording;
 
   return (
-    <div className={`line-compare-container ${isActive ? 'active-line' : ''}`}>
+    <div 
+      className={`line-compare-container ${isActive ? 'active-line' : ''} ${isActive && isSparkling ? 'sparkling' : ''}`}
+      style={isActive && isSparkling ? { '--sparkle-color': sparkleColor } as any : {}}
+    >
       <div className="original-text">
         {line.words.map((w) => (
           <React.Fragment key={w.id}>
