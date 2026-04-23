@@ -14,23 +14,33 @@ function App() {
   const [initError, setInitError] = useState<string | null>(null);
   const [parsedLines, setParsedLines] = useState<KaraokeLineData[] | null>(null);
   const [lineResults, setLineResults] = useState<LineCompareResult[]>([]);
-  
-  const [currentLineIndex, setCurrentLineIndex] = useState(0);
+
+  const [selectedLineIndex, setSelectedLineIndex] = useState<number | null>(null);
+  const [recordingLineIndex, setRecordingLineIndex] = useState<number | null>(null);
   const [isFinished, setIsFinished] = useState(false);
   const [currentLineTranscript, setCurrentLineTranscript] = useState('');
   const [isUserRecording, setIsUserRecording] = useState(false);
   const [isSparkling, setIsSparkling] = useState(false);
   const [sparkleColor, setSparkleColor] = useState('var(--neon-blue)');
+  const [recordingSessionToken, setRecordingSessionToken] = useState(0);
   const lastTranscriptRef = useRef('');
   const colorIndexRef = useRef(0);
+  const recordingSessionIdRef = useRef(0);
+  const pendingStartSessionIdRef = useRef<number | null>(null);
+  const requiresFreshInterimRef = useRef(false);
   const colors = ['var(--neon-blue)', 'var(--neon-pink)', 'var(--neon-green)', 'var(--neon-red)'];
 
   // We use a ref to hold the latest state because onFinalResult is a callback from the speech API listener
-  const stateRef = useRef({ parsedLines, currentLineIndex, isFinished, lineResults, currentLineTranscript });
-  
-  useEffect(() => {
-    stateRef.current = { parsedLines, currentLineIndex, isFinished, lineResults, currentLineTranscript };
-  }, [parsedLines, currentLineIndex, isFinished, lineResults, currentLineTranscript]);
+  const stateRef = useRef({
+    parsedLines,
+    selectedLineIndex,
+    recordingLineIndex,
+    isFinished,
+    lineResults,
+    currentLineTranscript,
+    isUserRecording,
+    isRecording: false
+  });
 
   useEffect(() => {
     buildTokenizer()
@@ -47,7 +57,6 @@ function App() {
     if (!currentLines || lineIdx >= currentLines.length) return;
 
     if (!textToJudge.trim()) {
-      // Nothing spoken, maybe set empty result or just return
       const filteredResults = results.filter(r => r.lineIndex !== lineIdx);
       setLineResults(filteredResults);
       return;
@@ -60,10 +69,10 @@ function App() {
     const spokenKana = spokenLine.originalKana;
     const spokenWords = spokenLine.words;
     const targetLine = currentLines[lineIdx];
-    
+
     const diffResult = compareKanaStrings(targetLine.originalKana, spokenKana);
     const spokenStatuses = getSpokenKanaStatuses(targetLine.originalKana, spokenKana);
-    
+
     let correctChars = 0;
     let totalChars = 0;
     diffResult.forEach(r => {
@@ -100,20 +109,68 @@ function App() {
     setLineResults([...filteredResults, newResult]);
   }, []);
 
-  const handleFinalResult = useCallback((transcript: string) => {
-    const { isFinished: finished } = stateRef.current;
-    if (finished) return;
-    
-    // Accumulate the transcript for the current line
-    setCurrentLineTranscript(prev => prev + transcript);
+  const advanceRecordingSession = useCallback(() => {
+    const nextSessionId = recordingSessionIdRef.current + 1;
+    recordingSessionIdRef.current = nextSessionId;
+    pendingStartSessionIdRef.current = null;
+    setRecordingSessionToken(nextSessionId);
+    return nextSessionId;
   }, []);
+
+  const handleFinalResult = useCallback((transcript: string) => {
+    const sessionIdAtRegistration = recordingSessionToken;
+    const {
+      isFinished: finished,
+      recordingLineIndex: activeRecordingLine,
+      isUserRecording: userRecording,
+      isRecording: activelyRecording
+    } = stateRef.current;
+
+    if (finished || !userRecording || !activelyRecording || activeRecordingLine === null) return;
+    if (recordingSessionIdRef.current !== sessionIdAtRegistration) return;
+    if (requiresFreshInterimRef.current) return;
+
+    setCurrentLineTranscript(prev => {
+      if (recordingSessionIdRef.current !== sessionIdAtRegistration) {
+        return prev;
+      }
+
+      return prev + transcript;
+    });
+  }, [recordingSessionToken]);
 
   const { isRecording, interimTranscript, error: speechError, start, stop } = useSpeechRecognition({
     onFinalResult: handleFinalResult
   });
 
+  useEffect(() => {
+    stateRef.current = {
+      parsedLines,
+      selectedLineIndex,
+      recordingLineIndex,
+      isFinished,
+      lineResults,
+      currentLineTranscript,
+      isUserRecording,
+      isRecording
+    };
+  }, [
+    parsedLines,
+    selectedLineIndex,
+    recordingLineIndex,
+    isFinished,
+    lineResults,
+    currentLineTranscript,
+    isUserRecording,
+    isRecording
+  ]);
+
   // interimTranscriptの更新を監視してキラキラエフェクトを発火させる
   useEffect(() => {
+    if (recordingLineIndex !== null && interimTranscript !== '') {
+      requiresFreshInterimRef.current = false;
+    }
+
     if (interimTranscript !== lastTranscriptRef.current && interimTranscript !== '') {
       const nextIndex = (colorIndexRef.current + 1) % colors.length;
       colorIndexRef.current = nextIndex;
@@ -121,50 +178,84 @@ function App() {
 
       setIsSparkling(true);
       const timer = setTimeout(() => setIsSparkling(false), 200);
+      lastTranscriptRef.current = interimTranscript;
       return () => clearTimeout(timer);
     }
+
     lastTranscriptRef.current = interimTranscript;
-  }, [interimTranscript]);
+  }, [interimTranscript, recordingLineIndex]);
+
+  useEffect(() => {
+    const pendingSessionId = pendingStartSessionIdRef.current;
+    if (!isUserRecording || recordingLineIndex === null || pendingSessionId === null) return;
+
+    if (pendingSessionId !== recordingSessionIdRef.current) {
+      pendingStartSessionIdRef.current = null;
+      return;
+    }
+
+    if (isRecording) {
+      pendingStartSessionIdRef.current = null;
+      return;
+    }
+
+    start();
+  }, [isRecording, isUserRecording, recordingLineIndex, recordingSessionToken, start]);
 
   // Watch for unexpected stops (e.g., timeout) and auto-restart if user still wants to record
   useEffect(() => {
-    if (isUserRecording && !isRecording) {
+    if (pendingStartSessionIdRef.current !== null) return;
+
+    if (isUserRecording && recordingLineIndex !== null && !isRecording) {
       start();
     }
-  }, [isRecording, isUserRecording, start]);
+  }, [isRecording, isUserRecording, recordingLineIndex, start]);
 
-  const toggleRecording = (idx: number) => {
-    if (isUserRecording) {
-      if (currentLineIndex === idx) {
-        // User clicked STOP on the active line
-        setIsUserRecording(false);
-        stop();
-        
-        // Use the current accumulated final text PLUS whatever is currently in the interim transcript
-        const finalFullText = stateRef.current.currentLineTranscript + interimTranscript;
-        judgeLine(idx, finalFullText);
-      } else {
-        // Switch to new line and start
-        setIsUserRecording(false);
-        stop();
-        const finalFullText = stateRef.current.currentLineTranscript + interimTranscript;
-        judgeLine(currentLineIndex, finalFullText);
+  const startRecordingForLine = useCallback((lineIdx: number, requireFreshInterim: boolean) => {
+    const nextSessionId = advanceRecordingSession();
+    pendingStartSessionIdRef.current = nextSessionId;
+    requiresFreshInterimRef.current = requireFreshInterim;
+    setSelectedLineIndex(lineIdx);
+    setRecordingLineIndex(lineIdx);
+    setCurrentLineTranscript('');
+    setLineResults(prev => prev.filter(r => r.lineIndex !== lineIdx));
+    setIsUserRecording(true);
+  }, [advanceRecordingSession]);
 
-        setTimeout(() => {
-          setIsUserRecording(true);
-          setCurrentLineIndex(idx);
-          setCurrentLineTranscript('');
-          setLineResults(prev => prev.filter(r => r.lineIndex !== idx));
-          start();
-        }, 200);
-      }
-    } else {
-      setIsUserRecording(true);
-      setCurrentLineIndex(idx);
-      setCurrentLineTranscript('');
-      setLineResults(prev => prev.filter(r => r.lineIndex !== idx));
-      start();
+  const stopRecordingForLine = useCallback((lineIdx: number) => {
+    advanceRecordingSession();
+    requiresFreshInterimRef.current = false;
+    setIsUserRecording(false);
+    setRecordingLineIndex(null);
+    stop();
+
+    const finalFullText = stateRef.current.currentLineTranscript + interimTranscript;
+    judgeLine(lineIdx, finalFullText);
+  }, [advanceRecordingSession, interimTranscript, judgeLine, stop]);
+
+  const stopRecognitionIfActive = useCallback(() => {
+    const { recordingLineIndex: activeRecordingLine, isUserRecording: userRecording, isRecording: activelyRecording } = stateRef.current;
+    if (activeRecordingLine !== null || userRecording || activelyRecording) {
+      stop();
     }
+  }, [stop]);
+
+  const toggleRecording = (nextLineIndex: number) => {
+    const { recordingLineIndex: activeRecordingLine } = stateRef.current;
+
+    if (activeRecordingLine === null) {
+      startRecordingForLine(nextLineIndex, false);
+      return;
+    }
+
+    if (activeRecordingLine === nextLineIndex) {
+      setSelectedLineIndex(nextLineIndex);
+      stopRecordingForLine(nextLineIndex);
+      return;
+    }
+
+    stopRecordingForLine(activeRecordingLine);
+    startRecordingForLine(nextLineIndex, true);
   };
 
   const error = initError || speechError;
@@ -173,9 +264,13 @@ function App() {
     try {
       const lines = parseTextToLines(text);
       if (lines.length > 0) {
+        advanceRecordingSession();
+        requiresFreshInterimRef.current = false;
+        stopRecognitionIfActive();
         setParsedLines(lines);
         setLineResults([]);
-        setCurrentLineIndex(0);
+        setSelectedLineIndex(0);
+        setRecordingLineIndex(null);
         setCurrentLineTranscript('');
         setIsUserRecording(false);
         setIsFinished(false);
@@ -187,21 +282,28 @@ function App() {
   };
 
   const handleReset = () => {
-    setIsUserRecording(false);
-    stop();
+    advanceRecordingSession();
+    requiresFreshInterimRef.current = false;
+    stopRecognitionIfActive();
     setParsedLines(null);
     setLineResults([]);
-    setCurrentLineIndex(0);
+    setSelectedLineIndex(null);
+    setRecordingLineIndex(null);
     setCurrentLineTranscript('');
+    setIsUserRecording(false);
     setIsFinished(false);
   };
 
   const handleRetry = () => {
-    setIsUserRecording(false);
-    stop();
+    const hasLines = Boolean(stateRef.current.parsedLines?.length);
+    advanceRecordingSession();
+    requiresFreshInterimRef.current = false;
+    stopRecognitionIfActive();
     setLineResults([]);
-    setCurrentLineIndex(0);
+    setSelectedLineIndex(hasLines ? 0 : null);
+    setRecordingLineIndex(null);
     setCurrentLineTranscript('');
+    setIsUserRecording(false);
     setIsFinished(false);
   };
 
@@ -218,7 +320,7 @@ function App() {
       <header className="header" onClick={handleReset} style={{ cursor: 'pointer', userSelect: 'none' }}>
         <h1>🗣️ 日本語発音チェッカー</h1>
       </header>
-      
+
       <main className="main-content">
         {error && <div className="error-message">{error}</div>}
 
@@ -230,14 +332,14 @@ function App() {
           <div className="karaoke-container panel">
             <div className="lines-display">
               {parsedLines.map((line, idx) => (
-                <LineCompare 
-                  key={idx} 
-                  line={line} 
-                  isActive={!isFinished && idx === currentLineIndex}
-                  isRecording={isUserRecording && idx === currentLineIndex}
-                  isSparkling={isSparkling}
+                <LineCompare
+                  key={idx}
+                  line={line}
+                  isActive={!isFinished && idx === selectedLineIndex}
+                  isRecording={isUserRecording && idx === recordingLineIndex}
+                  isSparkling={idx === recordingLineIndex && isSparkling}
                   sparkleColor={sparkleColor}
-                  result={lineResults.find(r => r.lineIndex === idx)} 
+                  result={lineResults.find(r => r.lineIndex === idx)}
                   onToggleRecord={toggleRecording}
                 />
               ))}
@@ -254,10 +356,10 @@ function App() {
         )}
 
         {isFinished && (
-          <ScorePanel 
-            totalChars={totalScoreChars} 
-            correctChars={correctScoreChars} 
-            onReset={handleReset} 
+          <ScorePanel
+            totalChars={totalScoreChars}
+            correctChars={correctScoreChars}
+            onReset={handleReset}
             onRetry={handleRetry}
           />
         )}
