@@ -153,7 +153,7 @@ const renderAnalyzedApp = async (text: string) => {
   const user = userEvent.setup();
   render(<App />);
 
-  const analyzeButton = await screen.findByRole('button');
+  const analyzeButton = await screen.findByRole('button', { name: /分析開始/i });
   await user.type(screen.getByRole('textbox'), text);
   await waitFor(() => expect(analyzeButton).toBeEnabled());
   await user.click(analyzeButton);
@@ -167,12 +167,17 @@ const getLineContainer = (lineText: string) => {
   return lineContainer as HTMLElement;
 };
 
-const getLineRecordButton = (lineText: string) => within(getLineContainer(lineText)).getByRole('button');
+const getLineRecordButton = (lineText: string) =>
+  within(getLineContainer(lineText)).getByRole('button', { name: /rec|stop/i });
 
 const getLineSpokenResult = (lineText: string) => {
   const spokenResult = getLineContainer(lineText).querySelector('.spoken-result');
   expect(spokenResult).not.toBeNull();
   return spokenResult as HTMLElement;
+};
+
+const expectNoLineSpokenResult = (lineText: string) => {
+  expect(getLineContainer(lineText).querySelector('.spoken-result')).toBeNull();
 };
 
 describe('App free line recording selection', () => {
@@ -256,5 +261,39 @@ describe('App free line recording selection', () => {
       expect(getLineContainer('left line')).not.toHaveTextContent('left first');
       expect(getLineSpokenResult('right line')).toHaveTextContent('right only');
     });
+  });
+
+  it('ignores a late final result from the previous line after switching to a new line', async () => {
+    const user = await renderAnalyzedApp('alpha line\nbeta line');
+
+    await user.click(getLineRecordButton('alpha line'));
+
+    await act(async () => {
+      mockState.emitFinal('alpha early');
+    });
+
+    await user.click(getLineRecordButton('beta line'));
+
+    await waitFor(() => {
+      expect(mockState.stopMock).toHaveBeenCalledTimes(1);
+      expect(mockState.startMock).toHaveBeenCalledTimes(2);
+      expect(getLineRecordButton('beta line')).toHaveTextContent(/stop/i);
+      expect(getLineSpokenResult('alpha line')).toHaveTextContent('alpha early');
+    });
+
+    await act(async () => {
+      mockState.emitFinal('alpha late');
+    });
+
+    await user.click(getLineRecordButton('beta line'));
+
+    await waitFor(() => {
+      expect(mockState.stopMock).toHaveBeenCalledTimes(2);
+    });
+
+    expectNoLineSpokenResult('beta line');
+    expect(getLineContainer('beta line')).not.toHaveTextContent('alpha late');
+    expect(getLineSpokenResult('alpha line')).toHaveTextContent('alpha early');
+    expect(getLineContainer('alpha line')).not.toHaveTextContent('alpha late');
   });
 });
