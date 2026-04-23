@@ -2,6 +2,7 @@
   "name": "temp-app",
   "private": true,
   "version": "0.0.0",
+  "description": "日本語カラオケ発音チェッカー。React + Vite で作成されたカラオケ形式の日本語発声・採点システム。",
   "type": "module",
   "scripts": {
     "dev": "vite",
