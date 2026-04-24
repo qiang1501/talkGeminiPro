@@ -8,11 +8,13 @@ export function useSpeechRecognition({ onFinalResult }: UseSpeechRecognitionProp
   const [isRecording, setIsRecording] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [canStart, setCanStart] = useState(true);
   const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
+      setCanStart(false);
       setError('お使いのブラウザは音声認識に対応していません。');
       return;
     }
@@ -44,10 +46,11 @@ export function useSpeechRecognition({ onFinalResult }: UseSpeechRecognitionProp
 
     rec.onend = () => {
       setIsRecording(false);
+      setCanStart(true);
     };
 
     recognitionRef.current = rec;
-    
+
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
@@ -56,16 +59,17 @@ export function useSpeechRecognition({ onFinalResult }: UseSpeechRecognitionProp
   }, [onFinalResult]);
 
   const start = useCallback(() => {
-    if (!recognitionRef.current) return;
+    if (!recognitionRef.current || !canStart) return;
     setError(null);
     setInterimTranscript('');
     try {
       recognitionRef.current.start();
       setIsRecording(true);
-    } catch(e) {
+      setCanStart(false);
+    } catch (e) {
       console.error('Start error', e);
     }
-  }, []);
+  }, [canStart]);
 
   const stop = useCallback(() => {
     if (!recognitionRef.current) return;
@@ -74,8 +78,7 @@ export function useSpeechRecognition({ onFinalResult }: UseSpeechRecognitionProp
     } catch (e) {
       console.error('Stop error', e);
     }
-    setIsRecording(false);
   }, []);
 
-  return { isRecording, interimTranscript, error, start, stop };
+  return { isRecording, interimTranscript, error, canStart, start, stop };
 }

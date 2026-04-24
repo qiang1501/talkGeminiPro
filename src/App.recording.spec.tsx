@@ -25,6 +25,7 @@ const mockState = vi.hoisted(() => {
   let isRecording = false;
   let interimTranscript = '';
   let error: string | null = null;
+  let canStart = true;
   let finalHandler: ((text: string) => void) | null = null;
   let previousFinalHandler: ((text: string) => void) | null = null;
   const listeners = new Set<() => void>();
@@ -68,7 +69,14 @@ const mockState = vi.hoisted(() => {
     ),
     katakanaToHiraganaMock: vi.fn((text: string) => text),
     startMock: vi.fn(() => {
+      if (!canStart) {
+        const invalidStateError = Object.assign(new Error('Recognition has not ended yet'), {
+          name: 'InvalidStateError',
+        });
+        throw invalidStateError;
+      }
       isRecording = true;
+      canStart = false;
       notify();
     }),
     stopMock: vi.fn(() => {
@@ -80,6 +88,7 @@ const mockState = vi.hoisted(() => {
       isRecording = false;
       interimTranscript = '';
       error = null;
+      canStart = true;
       finalHandler = null;
       previousFinalHandler = null;
       listeners.clear();
@@ -102,6 +111,7 @@ const mockState = vi.hoisted(() => {
         isRecording,
         interimTranscript,
         error,
+        canStart,
       };
     },
     attachFinalHandler(handler: (text: string) => void) {
@@ -118,6 +128,10 @@ const mockState = vi.hoisted(() => {
     },
     setInterim(text: string) {
       interimTranscript = text;
+      notify();
+    },
+    emitOnEnd() {
+      canStart = true;
       notify();
     },
   };
@@ -219,16 +233,43 @@ describe('App free line recording selection', () => {
 
     await waitFor(() => {
       expect(mockState.stopMock).toHaveBeenCalledTimes(1);
-      expect(mockState.startMock).toHaveBeenCalledTimes(2);
-      expect(getLineRecordButton('alpha line')).toHaveTextContent(/rec/i);
-      expect(getLineRecordButton('beta line')).toHaveTextContent(/stop/i);
       expect(getLineSpokenResult('alpha line')).toHaveTextContent('alpha final alpha tail');
+    });
+
+    expect(mockState.startMock).toHaveBeenCalledTimes(1);
+    expect(getLineRecordButton('alpha line')).toHaveTextContent(/rec/i);
+    expect(getLineRecordButton('beta line')).toHaveTextContent(/stop/i);
+
+    await act(async () => {
+      mockState.emitOnEnd();
+    });
+
+    await waitFor(() => {
+      expect(mockState.startMock).toHaveBeenCalledTimes(2);
     });
 
     expect(mockState.stopMock.mock.invocationCallOrder[0]).toBeLessThan(
       mockState.startMock.mock.invocationCallOrder[1],
     );
     expect(mockState.compareKanaStringsMock).toHaveBeenCalledWith('alpha line', 'alpha final alpha tail');
+  });
+
+  it('waits for onend before restarting recognition after switching lines', async () => {
+    const user = await renderAnalyzedApp('alpha line\nbeta line');
+
+    await user.click(getLineRecordButton('alpha line'));
+    await user.click(getLineRecordButton('beta line'));
+
+    expect(mockState.stopMock).toHaveBeenCalledTimes(1);
+    expect(mockState.startMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      mockState.emitOnEnd();
+    });
+
+    await waitFor(() => {
+      expect(mockState.startMock).toHaveBeenCalledTimes(2);
+    });
   });
 
   it('re-recording one line overwrites only that line result', async () => {
@@ -244,6 +285,10 @@ describe('App free line recording selection', () => {
       expect(getLineSpokenResult('left line')).toHaveTextContent('left first');
     });
 
+    await act(async () => {
+      mockState.emitOnEnd();
+    });
+
     await user.click(getLineRecordButton('right line'));
     await act(async () => {
       mockState.emitFinal('right only');
@@ -252,6 +297,10 @@ describe('App free line recording selection', () => {
 
     await waitFor(() => {
       expect(getLineSpokenResult('right line')).toHaveTextContent('right only');
+    });
+
+    await act(async () => {
+      mockState.emitOnEnd();
     });
 
     await user.click(getLineRecordButton('left line'));
@@ -284,9 +333,18 @@ describe('App free line recording selection', () => {
 
     await waitFor(() => {
       expect(mockState.stopMock).toHaveBeenCalledTimes(1);
+      expect(getLineSpokenResult('alpha line')).toHaveTextContent('alpha early');
+    });
+
+    expect(mockState.startMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      mockState.emitOnEnd();
+    });
+
+    await waitFor(() => {
       expect(mockState.startMock).toHaveBeenCalledTimes(2);
       expect(getLineRecordButton('beta line')).toHaveTextContent(/stop/i);
-      expect(getLineSpokenResult('alpha line')).toHaveTextContent('alpha early');
     });
 
     await act(async () => {
@@ -321,8 +379,17 @@ describe('App free line recording selection', () => {
 
     await waitFor(() => {
       expect(mockState.stopMock).toHaveBeenCalledTimes(1);
-      expect(mockState.startMock).toHaveBeenCalledTimes(2);
       expect(getLineSpokenResult('alpha line')).toHaveTextContent('alpha early alpha tail');
+    });
+
+    expect(mockState.startMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      mockState.emitOnEnd();
+    });
+
+    await waitFor(() => {
+      expect(mockState.startMock).toHaveBeenCalledTimes(2);
       expect(getLineRecordButton('beta line')).toHaveTextContent(/stop/i);
     });
 

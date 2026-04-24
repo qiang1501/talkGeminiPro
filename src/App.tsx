@@ -136,7 +136,7 @@ function App() {
     });
   }, [recordingSessionToken]);
 
-  const { isRecording, interimTranscript, error: speechError, start, stop } = useSpeechRecognition({
+  const { isRecording, interimTranscript, error: speechError, canStart, start, stop } = useSpeechRecognition({
     onFinalResult: handleFinalResult
   });
 
@@ -192,17 +192,19 @@ function App() {
       return;
     }
 
+    if (!canStart) return;
+
     start();
-  }, [isRecording, isUserRecording, recordingLineIndex, recordingSessionToken, start]);
+  }, [canStart, isRecording, isUserRecording, recordingLineIndex, recordingSessionToken, start]);
 
   // Watch for unexpected stops (e.g., timeout) and auto-restart if user still wants to record
   useEffect(() => {
     if (pendingStartSessionIdRef.current !== null) return;
 
-    if (isUserRecording && recordingLineIndex !== null && !isRecording) {
+    if (isUserRecording && recordingLineIndex !== null && !isRecording && canStart) {
       start();
     }
-  }, [isRecording, isUserRecording, recordingLineIndex, start]);
+  }, [canStart, isRecording, isUserRecording, recordingLineIndex, start]);
 
   const startRecordingForLine = useCallback((lineIdx: number) => {
     const nextSessionId = advanceRecordingSession();
