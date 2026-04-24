@@ -10,13 +10,24 @@ interface LineCompareProps {
   sparkleColor?: string;
   result?: LineCompareResult;
   onToggleRecord: (lineIndex: number) => void;
+  onHoverLine: (lineIndex: number) => void;
 }
 
-export const LineCompare: React.FC<LineCompareProps> = ({ line, isActive, isRecording, isSparkling, sparkleColor, result, onToggleRecord }) => {
+export const LineCompare: React.FC<LineCompareProps> = ({
+  line,
+  isActive,
+  isRecording,
+  isSparkling,
+  sparkleColor,
+  result,
+  onToggleRecord,
+  onHoverLine
+}) => {
   return (
     <div 
       className={`line-compare-container ${isActive ? 'active-line' : ''} ${isActive && isSparkling ? 'sparkling' : ''}`}
       style={isActive && isSparkling ? { '--sparkle-color': sparkleColor } as any : {}}
+      onMouseEnter={() => onHoverLine(line.lineIndex)}
     >
       <div className="original-text">
         {line.words.map((w) => (

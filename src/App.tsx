@@ -251,6 +251,14 @@ function App() {
     startRecordingForLine(nextLineIndex);
   };
 
+  const handleHoverLine = useCallback((lineIdx: number) => {
+    setSelectedLineIndex(lineIdx);
+  }, []);
+
+  const handleLeaveLines = useCallback(() => {
+    setSelectedLineIndex(null);
+  }, []);
+
   const error = initError || speechError;
 
   const handleAnalyze = (text: string) => {
@@ -261,7 +269,7 @@ function App() {
         stopRecognitionIfActive();
         setParsedLines(lines);
         setLineResults([]);
-        setSelectedLineIndex(0);
+        setSelectedLineIndex(null);
         setRecordingLineIndex(null);
         setCurrentLineTranscript('');
         setIsUserRecording(false);
@@ -286,11 +294,10 @@ function App() {
   };
 
   const handleRetry = () => {
-    const hasLines = Boolean(stateRef.current.parsedLines?.length);
     advanceRecordingSession();
     stopRecognitionIfActive();
     setLineResults([]);
-    setSelectedLineIndex(hasLines ? 0 : null);
+    setSelectedLineIndex(null);
     setRecordingLineIndex(null);
     setCurrentLineTranscript('');
     setIsUserRecording(false);
@@ -345,7 +352,7 @@ function App() {
 
         {parsedLines && !isFinished && (
           <div className="karaoke-container panel">
-            <div className="lines-display">
+            <div className="lines-display" onMouseLeave={handleLeaveLines}>
               {parsedLines.map((line, idx) => (
                 <LineCompare
                   key={idx}
@@ -356,6 +363,7 @@ function App() {
                   sparkleColor={sparkleColor}
                   result={lineResults.find(r => r.lineIndex === idx)}
                   onToggleRecord={toggleRecording}
+                  onHoverLine={handleHoverLine}
                 />
               ))}
             </div>

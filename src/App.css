@@ -209,7 +209,7 @@ button:active {
 
 .line-compare-container.active-line {
   background: rgba(0, 255, 255, 0.05);
-  border: 2px solid var(--neon-blue);
+  outline: 2px solid var(--neon-blue);
   box-shadow: 0 0 20px rgba(0, 255, 255, 0.1);
   transition: all 0.1s ease;
 }
