@@ -22,6 +22,11 @@ import { LoginPanel } from './components/LoginPanel';
 import { CustomReadingList, type CustomReadingItem } from './components/CustomReadingList';
 
 const AUTO_JUDGE_IDLE_MS = 5000;
+const PARTICLE_SURFACES = new Set([
+  'は', 'が', 'を', 'に', 'へ', 'で', 'と', 'の', 'も', 'や', 'か', 'ね', 'よ', 'な', 'わ',
+  'から', 'まで', 'より', 'って', 'しか', 'など',
+]);
+const PAUSE_PUNCTUATION_REGEX = /^[、。,.!?！？]$/;
 
 function App() {
   const [isInitializing, setIsInitializing] = useState(true);
@@ -484,6 +489,51 @@ function App() {
     setIsFinished(true);
   }, [advanceRecordingSession, interimTranscript, judgeLine, stop]);
 
+  const handleSpeakLine = useCallback((line: KaraokeLineData) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      return;
+    }
+
+    const synth = window.speechSynthesis;
+    const text = line.words.length > 0
+      ? line.words
+        .map((word, index, arr) => {
+          const token = word.surface;
+          const nextToken = arr[index + 1]?.surface ?? '';
+          const isLast = index === arr.length - 1;
+          if (isLast) return token;
+          if (PAUSE_PUNCTUATION_REGEX.test(token) || PAUSE_PUNCTUATION_REGEX.test(nextToken)) return token;
+          if (PARTICLE_SURFACES.has(token)) return `${token}  `;
+          return token;
+        })
+        .join('')
+      : (line.originalText || line.originalKana || '').trim();
+    if (!text) return;
+
+    synth.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'ja-JP';
+    utterance.rate = 0.6;
+    utterance.pitch = 1;
+
+    const jaVoice = synth
+      .getVoices()
+      .find((voice) => voice.lang.toLowerCase().startsWith('ja'));
+    if (jaVoice) {
+      utterance.voice = jaVoice;
+    }
+
+    synth.speak(utterance);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
   let totalScoreChars = 0;
   let correctScoreChars = 0;
   lineResults.forEach((r) => {
@@ -550,6 +600,7 @@ function App() {
                       sparkleColor={sparkleColor}
                       result={lineResults.find((r) => r.lineIndex === idx)}
                       onToggleRecord={toggleRecording}
+                      onSpeakLine={handleSpeakLine}
                       onHoverLine={handleHoverLine}
                     />
                   ))}

@@ -10,6 +10,7 @@ interface LineCompareProps {
   sparkleColor?: string;
   result?: LineCompareResult;
   onToggleRecord: (lineIndex: number) => void;
+  onSpeakLine: (line: KaraokeLineData) => void;
   onHoverLine: (lineIndex: number) => void;
 }
 
@@ -21,6 +22,7 @@ export const LineCompare: React.FC<LineCompareProps> = ({
   sparkleColor,
   result,
   onToggleRecord,
+  onSpeakLine,
   onHoverLine
 }) => {
   return (
@@ -49,7 +51,15 @@ export const LineCompare: React.FC<LineCompareProps> = ({
         </div>
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+      <div className="line-action-row">
+        <button
+          className="btn-record speak-btn"
+          onClick={() => onSpeakLine(line)}
+          style={{ padding: '0.5rem 1rem', fontSize: '1rem' }}
+          aria-label="Read line aloud"
+        >
+          🔊 再生
+        </button>
         <button 
           className={isRecording ? "btn-record stop-btn" : "btn-record start-btn"} 
           onClick={() => onToggleRecord(line.lineIndex)}
