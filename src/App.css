@@ -56,6 +56,13 @@ body::after {
   width: 100%;
 }
 
+.header-inner {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .header h1 {
   font-size: 3.5rem;
   color: var(--neon-pink);
@@ -70,6 +77,32 @@ body::after {
   align-items: center;
   justify-content: center;
   gap: 1rem;
+}
+
+.header-cross-btn {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 58px;
+  height: 58px;
+  padding: 0;
+  border: 3px solid var(--neon-pink);
+  color: var(--neon-pink);
+  text-transform: none;
+  font-family: 'Press Start 2P', var(--font-retro);
+  font-size: 1.4rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 12px var(--neon-pink), inset 0 0 10px rgba(240, 0, 255, 0.35);
+}
+
+.header-cross-btn:hover {
+  background: var(--neon-pink);
+  color: #06010a;
+  box-shadow: 0 0 24px var(--neon-pink);
 }
 
 @keyframes flicker {
@@ -527,6 +560,16 @@ textarea:focus {
 }
 
 @media (max-width: 768px) {
+  .header h1 {
+    font-size: 2.1rem;
+  }
+
+  .header-cross-btn {
+    width: 46px;
+    height: 46px;
+    font-size: 1.1rem;
+  }
+
   .custom-reading-grid {
     grid-template-columns: 1fr;
   }

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+﻿import { useEffect, useState, useCallback, useRef } from 'react';
 import './App.css';
 import { KaraokeLineData, LineCompareResult } from './types';
 import { buildTokenizer, parseTextToLines } from './utils/textParser';
@@ -35,13 +35,14 @@ function App() {
   const [recordingSessionToken, setRecordingSessionToken] = useState(0);
   const [lastLiveTextUpdateAt, setLastLiveTextUpdateAt] = useState<number | null>(null);
   const [englishReadings, setEnglishReadings] = useState<EnglishKatakanaMap>({});
+  const [isCustomReadingPage, setIsCustomReadingPage] = useState(false);
+
   const lastTranscriptRef = useRef('');
   const colorIndexRef = useRef(0);
   const recordingSessionIdRef = useRef(0);
   const pendingStartSessionIdRef = useRef<number | null>(null);
   const colors = ['var(--neon-blue)', 'var(--neon-pink)', 'var(--neon-green)', 'var(--neon-red)'];
 
-  // We use a ref to hold the latest state because onFinalResult is a callback from the speech API listener
   const stateRef = useRef({
     parsedLines,
     selectedLineIndex,
@@ -51,15 +52,15 @@ function App() {
     currentLineTranscript,
     isUserRecording,
     englishReadings,
-    isRecording: false
+    isRecording: false,
   });
 
   useEffect(() => {
     buildTokenizer()
       .then(() => setIsInitializing(false))
-      .catch(e => {
+      .catch((e) => {
         console.error('Failed to init kuromoji', e);
-        setInitError(`辞書の読み込みに失敗しました: ${e.message || String(e)}`);
+        setInitError(`初期化に失敗しました: ${e.message || String(e)}`);
         setIsInitializing(false);
       });
   }, []);
@@ -69,7 +70,7 @@ function App() {
     if (!currentLines || lineIdx >= currentLines.length) return;
 
     if (!textToJudge.trim()) {
-      const filteredResults = results.filter(r => r.lineIndex !== lineIdx);
+      const filteredResults = results.filter((r) => r.lineIndex !== lineIdx);
       setLineResults(filteredResults);
       return;
     }
@@ -87,7 +88,7 @@ function App() {
 
     let correctChars = 0;
     let totalChars = 0;
-    diffResult.forEach(r => {
+    diffResult.forEach((r) => {
       if (r.status !== 'ignored') {
         totalChars++;
         if (r.status === 'correct') correctChars++;
@@ -95,12 +96,12 @@ function App() {
     });
 
     let charIndex = 0;
-    spokenWords.forEach(word => {
+    spokenWords.forEach((word) => {
       const wordStatuses = [];
       for (let i = 0; i < word.reading.length; i++) {
         wordStatuses.push({
           char: word.reading[i],
-          status: spokenStatuses[charIndex] || 'missing'
+          status: spokenStatuses[charIndex] || 'missing',
         });
         charIndex++;
       }
@@ -114,10 +115,10 @@ function App() {
       spokenWords,
       diffResult,
       correctChars,
-      totalChars
+      totalChars,
     };
 
-    const filteredResults = results.filter(r => r.lineIndex !== lineIdx);
+    const filteredResults = results.filter((r) => r.lineIndex !== lineIdx);
     setLineResults([...filteredResults, newResult]);
   }, []);
 
@@ -135,22 +136,22 @@ function App() {
       isFinished: finished,
       recordingLineIndex: activeRecordingLine,
       isUserRecording: userRecording,
-      isRecording: activelyRecording
+      isRecording: activelyRecording,
     } = stateRef.current;
 
     if (finished || !userRecording || !activelyRecording || activeRecordingLine === null) return;
     if (recordingSessionIdRef.current !== sessionIdAtRegistration) return;
-    setCurrentLineTranscript(prev => {
+
+    setCurrentLineTranscript((prev) => {
       if (recordingSessionIdRef.current !== sessionIdAtRegistration) {
         return prev;
       }
-
       return prev + transcript;
     });
   }, [recordingSessionToken]);
 
   const { isRecording, interimTranscript, error: speechError, canStart, start, stop } = useSpeechRecognition({
-    onFinalResult: handleFinalResult
+    onFinalResult: handleFinalResult,
   });
 
   useEffect(() => {
@@ -163,7 +164,7 @@ function App() {
       currentLineTranscript,
       isUserRecording,
       englishReadings,
-      isRecording
+      isRecording,
     };
   }, [
     parsedLines,
@@ -174,15 +175,15 @@ function App() {
     currentLineTranscript,
     isUserRecording,
     englishReadings,
-    isRecording
+    isRecording,
   ]);
 
-  // interimTranscriptの更新を監視してキラキラエフェクトを発火させる
   useEffect(() => {
     if (interimTranscript !== lastTranscriptRef.current && interimTranscript !== '') {
       const nextIndex = (colorIndexRef.current + 1) % colors.length;
       colorIndexRef.current = nextIndex;
       setSparkleColor(colors[nextIndex]);
+
       if (isUserRecording && recordingLineIndex !== null) {
         setLastLiveTextUpdateAt(Date.now());
       }
@@ -211,14 +212,11 @@ function App() {
     }
 
     if (!canStart) return;
-
     start();
   }, [canStart, isFinished, isRecording, isUserRecording, recordingLineIndex, recordingSessionToken, start]);
 
-  // Watch for unexpected stops (e.g., timeout) and auto-restart if user still wants to record
   useEffect(() => {
     if (pendingStartSessionIdRef.current !== null) return;
-
     if (!isFinished && isUserRecording && recordingLineIndex !== null && !isRecording && canStart) {
       start();
     }
@@ -231,7 +229,7 @@ function App() {
     setRecordingLineIndex(lineIdx);
     setCurrentLineTranscript('');
     setLastLiveTextUpdateAt(Date.now());
-    setLineResults(prev => prev.filter(r => r.lineIndex !== lineIdx));
+    setLineResults((prev) => prev.filter((r) => r.lineIndex !== lineIdx));
     setIsUserRecording(true);
   }, [advanceRecordingSession]);
 
@@ -309,6 +307,10 @@ function App() {
     }));
   }, []);
 
+  const toggleCustomReadingPage = useCallback(() => {
+    setIsCustomReadingPage((prev) => !prev);
+  }, []);
+
   const handleAnalyze = async (text: string) => {
     try {
       const englishWords = extractEnglishWords(text);
@@ -339,7 +341,6 @@ function App() {
     setParsedLines(null);
     setEnglishReadings({});
     setLineResults([]);
-    setEnglishReadings({});
     setSelectedLineIndex(null);
     setRecordingLineIndex(null);
     setCurrentLineTranscript('');
@@ -365,7 +366,7 @@ function App() {
       recordingLineIndex: activeRecordingLine,
       currentLineTranscript: accumulatedTranscript,
       isUserRecording: userRecording,
-      isRecording: activelyRecording
+      isRecording: activelyRecording,
     } = stateRef.current;
 
     if (activeRecordingLine !== null || userRecording || activelyRecording) {
@@ -386,63 +387,77 @@ function App() {
     setIsFinished(true);
   }, [advanceRecordingSession, interimTranscript, judgeLine, stop]);
 
-  // スコアの計算
   let totalScoreChars = 0;
   let correctScoreChars = 0;
-  lineResults.forEach(r => {
+  lineResults.forEach((r) => {
     totalScoreChars += r.totalChars;
     correctScoreChars += r.correctChars;
   });
 
   return (
     <div className="App">
-      <header className="header" onClick={handleReset} style={{ cursor: 'pointer', userSelect: 'none' }}>
-        <h1>🗣️ 日本語発音チェッカー</h1>
+      <header className="header">
+        <div className="header-inner">
+          <h1 onClick={handleReset} style={{ cursor: 'pointer', userSelect: 'none' }}>
+            日本語発音チェッカー
+          </h1>
+          <button
+            type="button"
+            className="header-cross-btn"
+            aria-label={isCustomReadingPage ? 'Open checker page' : 'Open reading page'}
+            onClick={toggleCustomReadingPage}
+          >
+            ✚
+          </button>
+        </div>
       </header>
 
       <main className="main-content">
         {error && <div className="error-message">{error}</div>}
-        <CustomReadingPanel onSave={handleSaveCustomReading} />
 
-        {!parsedLines && (
-          <TextInputPanel onAnalyze={handleAnalyze} isLoading={isInitializing} />
-        )}
+        {isCustomReadingPage ? (
+          <CustomReadingPanel onSave={handleSaveCustomReading} />
+        ) : (
+          <>
+            {!parsedLines && <TextInputPanel onAnalyze={handleAnalyze} isLoading={isInitializing} />}
 
-        {parsedLines && !isFinished && (
-          <div className="karaoke-container panel">
-            <div className="lines-display" onMouseLeave={handleLeaveLines}>
-              {parsedLines.map((line, idx) => (
-                <LineCompare
-                  key={idx}
-                  line={line}
-                  isActive={!isFinished && idx === selectedLineIndex}
-                  isRecording={isUserRecording && idx === recordingLineIndex}
-                  isSparkling={idx === recordingLineIndex && isSparkling}
-                  sparkleColor={sparkleColor}
-                  result={lineResults.find(r => r.lineIndex === idx)}
-                  onToggleRecord={toggleRecording}
-                  onHoverLine={handleHoverLine}
-                />
-              ))}
-            </div>
+            {parsedLines && !isFinished && (
+              <div className="karaoke-container panel">
+                <div className="lines-display" onMouseLeave={handleLeaveLines}>
+                  {parsedLines.map((line, idx) => (
+                    <LineCompare
+                      key={idx}
+                      line={line}
+                      isActive={!isFinished && idx === selectedLineIndex}
+                      isRecording={isUserRecording && idx === recordingLineIndex}
+                      isSparkling={idx === recordingLineIndex && isSparkling}
+                      sparkleColor={sparkleColor}
+                      result={lineResults.find((r) => r.lineIndex === idx)}
+                      onToggleRecord={toggleRecording}
+                      onHoverLine={handleHoverLine}
+                    />
+                  ))}
+                </div>
 
-            <div className="finish-action" style={{ textAlign: 'center', marginTop: '30px', paddingBottom: '10px' }}>
-              <button className="btn-primary" onClick={handleFinish} style={{ fontSize: '24px', padding: '15px 50px' }}>
-                💯 採点する
-              </button>
-            </div>
+                <div className="finish-action" style={{ textAlign: 'center', marginTop: '30px', paddingBottom: '10px' }}>
+                  <button className="btn-primary" onClick={handleFinish} style={{ fontSize: '24px', padding: '15px 50px' }}>
+                    採点する
+                  </button>
+                </div>
 
-            <LivePreview transcript={interimTranscript} />
-          </div>
-        )}
+                <LivePreview transcript={interimTranscript} />
+              </div>
+            )}
 
-        {isFinished && (
-          <ScorePanel
-            totalChars={totalScoreChars}
-            correctChars={correctScoreChars}
-            onReset={handleReset}
-            onRetry={handleRetry}
-          />
+            {isFinished && (
+              <ScorePanel
+                totalChars={totalScoreChars}
+                correctChars={correctScoreChars}
+                onReset={handleReset}
+                onRetry={handleRetry}
+              />
+            )}
+          </>
         )}
       </main>
     </div>
