@@ -4,6 +4,7 @@ import './App.css';
 import { KaraokeLineData, LineCompareResult } from './types';
 import { buildTokenizer, parseTextToLines } from './utils/textParser';
 import { compareKanaStrings, getSpokenKanaStatuses } from './utils/diffMatcher';
+import { synthesizeAzureSpeech } from './utils/azureTts';
 import {
   extractEnglishWords,
   normalizeEnglishWordKey,
@@ -54,6 +55,9 @@ function App() {
   const colorIndexRef = useRef(0);
   const recordingSessionIdRef = useRef(0);
   const pendingStartSessionIdRef = useRef<number | null>(null);
+  const playbackAudioRef = useRef<HTMLAudioElement | null>(null);
+  const playbackObjectUrlRef = useRef<string | null>(null);
+  const speakRequestIdRef = useRef(0);
   const colors = ['var(--neon-blue)', 'var(--neon-pink)', 'var(--neon-green)', 'var(--neon-red)'];
 
   const stateRef = useRef({
@@ -489,12 +493,34 @@ function App() {
     setIsFinished(true);
   }, [advanceRecordingSession, interimTranscript, judgeLine, stop]);
 
-  const handleSpeakLine = useCallback((line: KaraokeLineData) => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      return;
+  const stopCurrentPlayback = useCallback(() => {
+    const audio = playbackAudioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.src = '';
+      playbackAudioRef.current = null;
     }
+    const objectUrl = playbackObjectUrlRef.current;
+    if (objectUrl) {
+      URL.revokeObjectURL(objectUrl);
+      playbackObjectUrlRef.current = null;
+    }
+  }, []);
 
+  const speakWithBrowser = useCallback((text: string) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     const synth = window.speechSynthesis;
+    synth.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'ja-JP';
+    utterance.rate = 0.6;
+    utterance.pitch = 1;
+    const jaVoice = synth.getVoices().find((voice) => voice.lang.toLowerCase().startsWith('ja'));
+    if (jaVoice) utterance.voice = jaVoice;
+    synth.speak(utterance);
+  }, []);
+
+  const handleSpeakLine = useCallback(async (line: KaraokeLineData) => {
     const text = line.words.length > 0
       ? line.words
         .map((word, index, arr) => {
@@ -510,29 +536,46 @@ function App() {
       : (line.originalText || line.originalKana || '').trim();
     if (!text) return;
 
-    synth.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'ja-JP';
-    utterance.rate = 0.6;
-    utterance.pitch = 1;
+    const requestId = speakRequestIdRef.current + 1;
+    speakRequestIdRef.current = requestId;
 
-    const jaVoice = synth
-      .getVoices()
-      .find((voice) => voice.lang.toLowerCase().startsWith('ja'));
-    if (jaVoice) {
-      utterance.voice = jaVoice;
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
     }
+    stopCurrentPlayback();
 
-    synth.speak(utterance);
-  }, []);
+    try {
+      const audioBlob = await synthesizeAzureSpeech(text, { rate: '-25%' });
+      if (speakRequestIdRef.current !== requestId) return;
+
+      const objectUrl = URL.createObjectURL(audioBlob);
+      playbackObjectUrlRef.current = objectUrl;
+      const audio = new Audio(objectUrl);
+      playbackAudioRef.current = audio;
+
+      audio.onended = () => {
+        stopCurrentPlayback();
+      };
+      audio.onerror = () => {
+        stopCurrentPlayback();
+      };
+
+      await audio.play();
+    } catch (error) {
+      console.warn('Azure TTS playback failed, fallback to browser speech synthesis.', error);
+      if (speakRequestIdRef.current !== requestId) return;
+      speakWithBrowser(text);
+    }
+  }, [speakWithBrowser, stopCurrentPlayback]);
 
   useEffect(() => {
     return () => {
+      stopCurrentPlayback();
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
     };
-  }, []);
+  }, [stopCurrentPlayback]);
 
   let totalScoreChars = 0;
   let correctScoreChars = 0;

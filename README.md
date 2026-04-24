@@ -74,3 +74,23 @@ Users can register custom readings from the web page.
 
 For local dev, you can set `VITE_SUPABASE_SAVE_READING_URL` explicitly.
 If omitted, the app derives it from `VITE_SUPABASE_TRANSLITERATE_URL`.
+
+### Azure TTS (Recommended Playback)
+
+The line playback button can use Azure AI Speech via Supabase Edge Function.
+The browser `speechSynthesis` remains as a fallback.
+
+1. Deploy Edge Function:
+   - Path: `supabase/functions/azure-tts/index.ts`
+   - Command: `supabase functions deploy azure-tts`
+2. Set Supabase function secrets:
+   - `AZURE_SPEECH_KEY`
+   - `AZURE_SPEECH_REGION` (example: `westus`)
+   - Optional: `AZURE_SPEECH_VOICE` (default: `ja-JP-NanamiNeural`)
+3. Set frontend env:
+   - `VITE_SUPABASE_AZURE_TTS_URL`
+   - If omitted, frontend derives endpoint from `VITE_SUPABASE_TRANSLITERATE_URL` by replacing `/transliterate` with `/azure-tts`.
+
+Security note:
+- Never place `AZURE_SPEECH_KEY` in frontend code or `.env` for Vite.
+- Keep it only in Supabase Function Secrets.
