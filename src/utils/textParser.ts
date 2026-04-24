@@ -19,7 +19,11 @@ export const buildTokenizer = (): Promise<void> => {
 
 export const parseTextToLines = (text: string): KaraokeLineData[] => {
   if (!tokenizer) throw new Error('Tokenizer not initialized');
-  const lines = text.split('\n').filter(l => l.trim() !== '');
+  const lines = text
+    .split(/\r?\n/g)
+    .flatMap(line => line.match(/[^。]+。?|。/g) ?? [])
+    .map(l => l.trim())
+    .filter(l => l !== '');
   const result: KaraokeLineData[] = [];
 
   const specialDates: Record<string, string> = {
