@@ -9,6 +9,8 @@ import { LivePreview } from './components/LivePreview';
 import { ScorePanel } from './components/ScorePanel';
 import { LineCompare } from './components/LineCompare';
 
+const AUTO_JUDGE_IDLE_MS = 5000;
+
 function App() {
   const [isInitializing, setIsInitializing] = useState(true);
   const [initError, setInitError] = useState<string | null>(null);
@@ -23,6 +25,7 @@ function App() {
   const [isSparkling, setIsSparkling] = useState(false);
   const [sparkleColor, setSparkleColor] = useState('var(--neon-blue)');
   const [recordingSessionToken, setRecordingSessionToken] = useState(0);
+  const [lastLiveTextUpdateAt, setLastLiveTextUpdateAt] = useState<number | null>(null);
   const lastTranscriptRef = useRef('');
   const colorIndexRef = useRef(0);
   const recordingSessionIdRef = useRef(0);
@@ -168,6 +171,9 @@ function App() {
       const nextIndex = (colorIndexRef.current + 1) % colors.length;
       colorIndexRef.current = nextIndex;
       setSparkleColor(colors[nextIndex]);
+      if (isUserRecording && recordingLineIndex !== null) {
+        setLastLiveTextUpdateAt(Date.now());
+      }
 
       setIsSparkling(true);
       const timer = setTimeout(() => setIsSparkling(false), 200);
@@ -176,7 +182,7 @@ function App() {
     }
 
     lastTranscriptRef.current = interimTranscript;
-  }, [interimTranscript, recordingLineIndex]);
+  }, [interimTranscript, isUserRecording, recordingLineIndex]);
 
   useEffect(() => {
     const pendingSessionId = pendingStartSessionIdRef.current;
@@ -212,6 +218,7 @@ function App() {
     setSelectedLineIndex(lineIdx);
     setRecordingLineIndex(lineIdx);
     setCurrentLineTranscript('');
+    setLastLiveTextUpdateAt(Date.now());
     setLineResults(prev => prev.filter(r => r.lineIndex !== lineIdx));
     setIsUserRecording(true);
   }, [advanceRecordingSession]);
@@ -220,6 +227,7 @@ function App() {
     advanceRecordingSession();
     setIsUserRecording(false);
     setRecordingLineIndex(null);
+    setLastLiveTextUpdateAt(null);
     stop();
 
     const finalFullText = stateRef.current.currentLineTranscript + interimTranscript;
@@ -251,6 +259,24 @@ function App() {
     startRecordingForLine(nextLineIndex);
   };
 
+  useEffect(() => {
+    if (isFinished || !isUserRecording || recordingLineIndex === null) return;
+    if (lastLiveTextUpdateAt === null) return;
+
+    const elapsedMs = Date.now() - lastLiveTextUpdateAt;
+    const remainingMs = Math.max(0, AUTO_JUDGE_IDLE_MS - elapsedMs);
+
+    const timer = setTimeout(() => {
+      const { recordingLineIndex: activeRecordingLine, isUserRecording: userRecording } = stateRef.current;
+      if (isFinished || !userRecording || activeRecordingLine === null) return;
+
+      setSelectedLineIndex(activeRecordingLine);
+      stopRecordingForLine(activeRecordingLine);
+    }, remainingMs);
+
+    return () => clearTimeout(timer);
+  }, [isFinished, isUserRecording, lastLiveTextUpdateAt, recordingLineIndex, stopRecordingForLine]);
+
   const handleHoverLine = useCallback((lineIdx: number) => {
     setSelectedLineIndex(lineIdx);
   }, []);
@@ -272,6 +298,7 @@ function App() {
         setSelectedLineIndex(null);
         setRecordingLineIndex(null);
         setCurrentLineTranscript('');
+        setLastLiveTextUpdateAt(null);
         setIsUserRecording(false);
         setIsFinished(false);
       }
@@ -289,6 +316,7 @@ function App() {
     setSelectedLineIndex(null);
     setRecordingLineIndex(null);
     setCurrentLineTranscript('');
+    setLastLiveTextUpdateAt(null);
     setIsUserRecording(false);
     setIsFinished(false);
   };
@@ -300,6 +328,7 @@ function App() {
     setSelectedLineIndex(null);
     setRecordingLineIndex(null);
     setCurrentLineTranscript('');
+    setLastLiveTextUpdateAt(null);
     setIsUserRecording(false);
     setIsFinished(false);
   };
@@ -319,6 +348,7 @@ function App() {
       setIsUserRecording(false);
       setRecordingLineIndex(null);
       setCurrentLineTranscript('');
+      setLastLiveTextUpdateAt(null);
       stop();
 
       if (activeRecordingLine !== null) {

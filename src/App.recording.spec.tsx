@@ -448,4 +448,24 @@ describe('App free line recording selection', () => {
       expect(mockState.startMock).toHaveBeenCalledTimes(1);
     });
   });
+
+  it('auto-stops and judges after 5 seconds without new live-preview text', async () => {
+    const user = await renderAnalyzedApp('alpha line');
+
+    await user.click(getLineRecordButton('alpha line'));
+
+    await act(async () => {
+      mockState.setInterim('alpha typing');
+    });
+
+    await waitFor(
+      () => {
+        expect(mockState.stopMock).toHaveBeenCalledTimes(1);
+        expect(getLineSpokenResult('alpha line')).toHaveTextContent('alpha typing');
+      },
+      { timeout: 6500 },
+    );
+
+    expect(getLineRecordButton('alpha line')).toHaveTextContent(/rec/i);
+  }, 12000);
 });

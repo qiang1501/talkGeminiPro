@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DotGothic16&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DotGothic16&family=Press+Start+2P&display=swap');
 
 :root {
   --neon-blue: #0ff;
@@ -157,39 +157,78 @@ button:active {
 
 /* Record Buttons */
 .btn-record {
-  font-size: 1.5rem;
-  letter-spacing: 0.1em;
+  font-family: 'Press Start 2P', var(--font-retro);
+  font-size: 1.1rem;
+  letter-spacing: 0.06em;
+  line-height: 1.35;
+  padding: 0.95rem 1.35rem;
+  border-width: 4px;
+  text-shadow: none;
+  image-rendering: pixelated;
+  transition: transform 0.08s steps(2, end), box-shadow 0.08s steps(2, end), background-color 0.08s steps(2, end), color 0.08s steps(2, end);
 }
 
 .start-btn {
+  background: #39ff14;
   border-color: var(--neon-green);
-  color: var(--neon-green);
-  box-shadow: 0 0 15px var(--neon-green), inset 0 0 15px var(--neon-green);
+  color: #071a02;
+  box-shadow:
+    inset 0 0 0 3px #1dc903,
+    4px 4px 0 #0b3d03,
+    0 0 16px rgba(57, 255, 20, 0.55);
 }
 
 .start-btn:hover {
-  background: var(--neon-green);
-  color: #000;
-  box-shadow: 0 0 30px var(--neon-green);
+  background: #4bff24;
+  color: #021001;
+  transform: translate(1px, 1px);
+  box-shadow:
+    inset 0 0 0 3px #27dd08,
+    3px 3px 0 #0b3d03,
+    0 0 20px rgba(57, 255, 20, 0.7);
 }
 
 .stop-btn {
+  background: #ff003c;
   border-color: var(--neon-red);
-  color: var(--neon-red);
+  color: #220009;
+  box-shadow:
+    inset 0 0 0 3px #c5002f,
+    4px 4px 0 #4a0012,
+    0 0 16px rgba(255, 0, 60, 0.55);
   animation: rec-blink 1s infinite;
 }
 
 .stop-btn:hover {
-  background: var(--neon-red);
-  color: #000;
+  background: #ff1a4f;
+  color: #1b0006;
+  transform: translate(1px, 1px);
   animation: none;
-  box-shadow: 0 0 30px var(--neon-red);
+  box-shadow:
+    inset 0 0 0 3px #d80a3a,
+    3px 3px 0 #4a0012,
+    0 0 20px rgba(255, 0, 60, 0.7);
 }
 
 @keyframes rec-blink {
-  0% { box-shadow: 0 0 15px var(--neon-red), inset 0 0 15px var(--neon-red); color: var(--neon-red); }
-  50% { box-shadow: none; color: #500; border-color: #500; }
-  100% { box-shadow: 0 0 15px var(--neon-red), inset 0 0 15px var(--neon-red); color: var(--neon-red); }
+  0% {
+    box-shadow:
+      inset 0 0 0 3px #c5002f,
+      4px 4px 0 #4a0012,
+      0 0 16px rgba(255, 0, 60, 0.55);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 3px #8f0022,
+      4px 4px 0 #2d000b,
+      0 0 6px rgba(255, 0, 60, 0.35);
+  }
+  100% {
+    box-shadow:
+      inset 0 0 0 3px #c5002f,
+      4px 4px 0 #4a0012,
+      0 0 16px rgba(255, 0, 60, 0.55);
+  }
 }
 
 /* Line Display Area */
