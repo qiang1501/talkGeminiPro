@@ -1,6 +1,7 @@
 import kuromoji from 'kuromoji';
 import type { KaraokeWord, KaraokeLineData } from '../types';
 import { normalizeToKatakana } from './katakana';
+import { getEnglishKatakanaReading, type EnglishKatakanaMap } from './englishKatakana';
 
 let tokenizer: kuromoji.Tokenizer<kuromoji.IpadicFeatures> | null = null;
 
@@ -17,7 +18,7 @@ export const buildTokenizer = (): Promise<void> => {
   });
 };
 
-export const parseTextToLines = (text: string): KaraokeLineData[] => {
+export const parseTextToLines = (text: string, englishReadings: EnglishKatakanaMap = {}): KaraokeLineData[] => {
   if (!tokenizer) throw new Error('Tokenizer not initialized');
   const lines = text
     .split(/\r?\n/g)
@@ -71,9 +72,11 @@ export const parseTextToLines = (text: string): KaraokeLineData[] => {
 
       // 通常のトークン処理
       const token = tokens[i];
-      const reading = token.reading 
-        ? normalizeToKatakana(token.reading) 
-        : normalizeToKatakana(token.surface_form);
+      const englishReading = getEnglishKatakanaReading(token.surface_form, englishReadings);
+      const reading = englishReading
+        ?? (token.reading
+          ? normalizeToKatakana(token.reading)
+          : normalizeToKatakana(token.surface_form));
         
       originalKana += reading;
 
@@ -94,10 +97,11 @@ export const parseTextToLines = (text: string): KaraokeLineData[] => {
 };
 
 // 確定音声結果もパースして読み順の配列を返す
-export const parseSpeechResultToReadings = (speechText: string): string[] => {
+export const parseSpeechResultToReadings = (speechText: string, englishReadings: EnglishKatakanaMap = {}): string[] => {
   if (!tokenizer) return [];
   const tokens = tokenizer.tokenize(speechText);
   return tokens.map(t => 
-    t.reading ? normalizeToKatakana(t.reading) : normalizeToKatakana(t.surface_form)
+    getEnglishKatakanaReading(t.surface_form, englishReadings)
+      ?? (t.reading ? normalizeToKatakana(t.reading) : normalizeToKatakana(t.surface_form))
   );
 };

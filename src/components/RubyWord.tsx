@@ -12,6 +12,7 @@ export const RubyWord: React.FC<RubyWordProps> = ({ word, isSpoken }) => {
   
   // 漢字が含まれるか判定
   const hasKanji = /[\u4E00-\u9FFF]/.test(word.surface);
+  const hasAlphabet = /[A-Za-z]/.test(word.surface);
   
   // 漢字が含まれていない場合でも、surfaceとhiraganaの文字数が合わない場合はルビを振る
   const hiraganaReading = katakanaToHiragana(word.reading);
@@ -19,7 +20,7 @@ export const RubyWord: React.FC<RubyWordProps> = ({ word, isSpoken }) => {
   // surfaceがひらがなで一致している場合はルビ不要
   const isExactMatch = word.surface === hiraganaReading;
   
-  const needsRuby = hasKanji || (!isLengthMatch && !isExactMatch);
+  const needsRuby = hasKanji || (hasAlphabet && !isExactMatch) || (!isLengthMatch && !isExactMatch);
 
   // ルビ用の文字要素を生成
   let rubyElements: React.ReactNode = null;

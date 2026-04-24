@@ -3,6 +3,7 @@ import './App.css';
 import { KaraokeLineData, LineCompareResult } from './types';
 import { buildTokenizer, parseTextToLines } from './utils/textParser';
 import { compareKanaStrings, getSpokenKanaStatuses } from './utils/diffMatcher';
+import { extractEnglishWords, transliterateEnglishWords, type EnglishKatakanaMap } from './utils/englishKatakana';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 import { TextInputPanel } from './components/TextInputPanel';
 import { LivePreview } from './components/LivePreview';
@@ -26,6 +27,7 @@ function App() {
   const [sparkleColor, setSparkleColor] = useState('var(--neon-blue)');
   const [recordingSessionToken, setRecordingSessionToken] = useState(0);
   const [lastLiveTextUpdateAt, setLastLiveTextUpdateAt] = useState<number | null>(null);
+  const [englishReadings, setEnglishReadings] = useState<EnglishKatakanaMap>({});
   const lastTranscriptRef = useRef('');
   const colorIndexRef = useRef(0);
   const recordingSessionIdRef = useRef(0);
@@ -41,6 +43,7 @@ function App() {
     lineResults,
     currentLineTranscript,
     isUserRecording,
+    englishReadings,
     isRecording: false
   });
 
@@ -55,7 +58,7 @@ function App() {
   }, []);
 
   const judgeLine = useCallback((lineIdx: number, textToJudge: string) => {
-    const { parsedLines: currentLines, lineResults: results } = stateRef.current;
+    const { parsedLines: currentLines, lineResults: results, englishReadings: currentEnglishReadings } = stateRef.current;
     if (!currentLines || lineIdx >= currentLines.length) return;
 
     if (!textToJudge.trim()) {
@@ -64,7 +67,7 @@ function App() {
       return;
     }
 
-    const spokenLines = parseTextToLines(textToJudge);
+    const spokenLines = parseTextToLines(textToJudge, currentEnglishReadings);
     if (spokenLines.length === 0) return;
 
     const spokenLine = spokenLines[0];
@@ -152,6 +155,7 @@ function App() {
       lineResults,
       currentLineTranscript,
       isUserRecording,
+      englishReadings,
       isRecording
     };
   }, [
@@ -162,6 +166,7 @@ function App() {
     lineResults,
     currentLineTranscript,
     isUserRecording,
+    englishReadings,
     isRecording
   ]);
 
@@ -287,12 +292,15 @@ function App() {
 
   const error = initError || speechError;
 
-  const handleAnalyze = (text: string) => {
+  const handleAnalyze = async (text: string) => {
     try {
-      const lines = parseTextToLines(text);
+      const englishWords = extractEnglishWords(text);
+      const convertedReadings = await transliterateEnglishWords(englishWords);
+      const lines = parseTextToLines(text, convertedReadings);
       if (lines.length > 0) {
         advanceRecordingSession();
         stopRecognitionIfActive();
+        setEnglishReadings(convertedReadings);
         setParsedLines(lines);
         setLineResults([]);
         setSelectedLineIndex(null);
@@ -312,7 +320,9 @@ function App() {
     advanceRecordingSession();
     stopRecognitionIfActive();
     setParsedLines(null);
+    setEnglishReadings({});
     setLineResults([]);
+    setEnglishReadings({});
     setSelectedLineIndex(null);
     setRecordingLineIndex(null);
     setCurrentLineTranscript('');

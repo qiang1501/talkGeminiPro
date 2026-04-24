@@ -45,3 +45,17 @@
 - 音声認識には `Web Speech API` を利用しているため、対応しているブラウザ（主に Google Chrome や MS Edge 最新版）でご利用ください。
 - マイクの許可を求められた場合は「許可」を選択してください。
 - 各行の `REC` は任意の順で選択できます。録音中に別の行へ切り替えると、先に前の行を判定してから新しい行の録音を開始します。
+
+## English Word Transliteration (GitHub Pages + Supabase)
+
+This app supports English words inside Japanese text by converting them into Katakana readings.
+
+1. Deploy Supabase Edge Function:
+   - Path in this repo: `supabase/functions/transliterate/index.ts`
+   - Deploy command example: `supabase functions deploy transliterate`
+2. Set frontend environment variables (for Vite):
+   - `VITE_SUPABASE_TRANSLITERATE_URL`
+   - `VITE_SUPABASE_ANON_KEY` (optional but recommended)
+3. Use `.env.example` as a template for local `.env`.
+
+If the Supabase endpoint is not configured or temporarily unavailable, the app automatically falls back to local transliteration rules.
