@@ -180,7 +180,7 @@ function App() {
 
   useEffect(() => {
     const pendingSessionId = pendingStartSessionIdRef.current;
-    if (!isUserRecording || recordingLineIndex === null || pendingSessionId === null) return;
+    if (isFinished || !isUserRecording || recordingLineIndex === null || pendingSessionId === null) return;
 
     if (pendingSessionId !== recordingSessionIdRef.current) {
       pendingStartSessionIdRef.current = null;
@@ -195,16 +195,16 @@ function App() {
     if (!canStart) return;
 
     start();
-  }, [canStart, isRecording, isUserRecording, recordingLineIndex, recordingSessionToken, start]);
+  }, [canStart, isFinished, isRecording, isUserRecording, recordingLineIndex, recordingSessionToken, start]);
 
   // Watch for unexpected stops (e.g., timeout) and auto-restart if user still wants to record
   useEffect(() => {
     if (pendingStartSessionIdRef.current !== null) return;
 
-    if (isUserRecording && recordingLineIndex !== null && !isRecording && canStart) {
+    if (!isFinished && isUserRecording && recordingLineIndex !== null && !isRecording && canStart) {
       start();
     }
-  }, [canStart, isRecording, isUserRecording, recordingLineIndex, start]);
+  }, [canStart, isFinished, isRecording, isUserRecording, recordingLineIndex, start]);
 
   const startRecordingForLine = useCallback((lineIdx: number) => {
     const nextSessionId = advanceRecordingSession();
@@ -297,6 +297,31 @@ function App() {
     setIsFinished(false);
   };
 
+  const handleFinish = useCallback(() => {
+    const {
+      recordingLineIndex: activeRecordingLine,
+      currentLineTranscript: accumulatedTranscript,
+      isUserRecording: userRecording,
+      isRecording: activelyRecording
+    } = stateRef.current;
+
+    if (activeRecordingLine !== null || userRecording || activelyRecording) {
+      const finalFullText = accumulatedTranscript + interimTranscript;
+
+      advanceRecordingSession();
+      setIsUserRecording(false);
+      setRecordingLineIndex(null);
+      setCurrentLineTranscript('');
+      stop();
+
+      if (activeRecordingLine !== null) {
+        judgeLine(activeRecordingLine, finalFullText);
+      }
+    }
+
+    setIsFinished(true);
+  }, [advanceRecordingSession, interimTranscript, judgeLine, stop]);
+
   // スコアの計算
   let totalScoreChars = 0;
   let correctScoreChars = 0;
@@ -336,7 +361,7 @@ function App() {
             </div>
 
             <div className="finish-action" style={{ textAlign: 'center', marginTop: '30px', paddingBottom: '10px' }}>
-              <button className="btn-primary" onClick={() => setIsFinished(true)} style={{ fontSize: '24px', padding: '15px 50px' }}>
+              <button className="btn-primary" onClick={handleFinish} style={{ fontSize: '24px', padding: '15px 50px' }}>
                 💯 採点する
               </button>
             </div>

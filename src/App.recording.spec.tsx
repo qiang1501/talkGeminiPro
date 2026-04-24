@@ -202,6 +202,12 @@ const expectNoLineSpokenResult = (lineText: string) => {
   expect(getLineContainer(lineText).querySelector('.spoken-result')).toBeNull();
 };
 
+const getFinishButton = () => {
+  const finishButton = document.querySelector('.finish-action button');
+  expect(finishButton).not.toBeNull();
+  return finishButton as HTMLButtonElement;
+};
+
 describe('App free line recording selection', () => {
   beforeEach(() => {
     mockState.reset();
@@ -408,5 +414,38 @@ describe('App free line recording selection', () => {
     expect(getLineContainer('beta line')).not.toHaveTextContent('alpha stale');
     expect(getLineSpokenResult('alpha line')).toHaveTextContent('alpha early alpha tail');
     expect(getLineContainer('alpha line')).not.toHaveTextContent('alpha stale');
+  });
+
+  it('stops and judges the active recording when finishing, without restarting afterward', async () => {
+    const user = await renderAnalyzedApp('alpha line\nbeta line');
+
+    await user.click(getLineRecordButton('alpha line'));
+
+    await act(async () => {
+      mockState.emitFinal('alpha final');
+    });
+    await act(async () => {
+      mockState.setInterim(' alpha tail');
+    });
+
+    await user.click(getFinishButton());
+
+    await waitFor(() => {
+      expect(mockState.stopMock).toHaveBeenCalledTimes(1);
+      expect(mockState.compareKanaStringsMock).toHaveBeenCalledWith(
+        'alpha line',
+        'alpha final alpha tail',
+      );
+    });
+
+    expect(document.querySelector('.score-panel')).not.toBeNull();
+
+    await act(async () => {
+      mockState.emitOnEnd();
+    });
+
+    await waitFor(() => {
+      expect(mockState.startMock).toHaveBeenCalledTimes(1);
+    });
   });
 });
