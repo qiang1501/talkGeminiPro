@@ -20,6 +20,23 @@ function createAdminClient() {
   });
 }
 
+function parseAllowedEmails(): string[] {
+  const raw = Deno.env.get('ALLOWED_READING_EDITOR_EMAILS') ?? 'hongqiang365@gmail.com';
+  return raw
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+async function getRequestUserEmail(accessToken: string): Promise<string | null> {
+  const admin = createAdminClient();
+  if (!admin) return null;
+
+  const { data, error } = await admin.auth.getUser(accessToken);
+  if (error || !data.user?.email) return null;
+  return data.user.email.toLowerCase();
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS_HEADERS });
@@ -33,6 +50,24 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const authHeader = req.headers.get('Authorization') ?? '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : '';
+    if (!token) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const userEmail = await getRequestUserEmail(token);
+    const allowedEmails = parseAllowedEmails();
+    if (!userEmail || !allowedEmails.includes(userEmail)) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      });
+    }
+
     const body = (await req.json()) as { word?: unknown; reading?: unknown };
     const word = typeof body.word === 'string' ? body.word.trim() : '';
     const reading = typeof body.reading === 'string' ? body.reading.trim() : '';

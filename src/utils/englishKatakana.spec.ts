@@ -71,12 +71,15 @@ describe('saveCustomReading', () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal('fetch', fetchMock);
 
-    await saveCustomReading('AWS', 'エーダブリューエス');
+    await saveCustomReading('AWS', 'エーダブリューエス', 'user-access-token');
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe('https://example.com/functions/v1/save-reading');
     expect(fetchMock.mock.calls[0][1]).toMatchObject({
       method: 'POST',
+      headers: expect.objectContaining({
+        Authorization: 'Bearer user-access-token',
+      }),
       body: JSON.stringify({
         word: 'AWS',
         reading: 'エーダブリューエス',

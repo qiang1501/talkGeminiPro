@@ -357,7 +357,7 @@ export function buildSaveReadingEndpoint(): string | null {
   return transliterateUrl.replace(/\/transliterate$/, '/save-reading');
 }
 
-export async function saveCustomReading(word: string, reading: string): Promise<void> {
+export async function saveCustomReading(word: string, reading: string, accessToken: string): Promise<void> {
   const endpoint = buildSaveReadingEndpoint();
   if (!endpoint) {
     throw new Error('Save Reading API endpoint is not configured.');
@@ -371,15 +371,18 @@ export async function saveCustomReading(word: string, reading: string): Promise<
   if (!reading.trim()) {
     throw new Error('Reading is required.');
   }
+  if (!accessToken) {
+    throw new Error('Login is required.');
+  }
 
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-  if (anonKey) {
-    headers.apikey = anonKey;
-    headers.Authorization = `Bearer ${anonKey}`;
-  }
+    if (anonKey) {
+      headers.apikey = anonKey;
+    }
+    headers.Authorization = `Bearer ${accessToken}`;
 
   const response = await fetch(endpoint, {
     method: 'POST',

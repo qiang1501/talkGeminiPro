@@ -512,6 +512,17 @@ textarea:focus {
   margin-bottom: 2rem;
 }
 
+.login-panel {
+  text-align: left;
+  margin-bottom: 1rem;
+}
+
+.login-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
 .custom-reading-panel h2 {
   margin-top: 0;
   color: #fff;
@@ -559,6 +570,29 @@ textarea:focus {
   margin-top: 0.75rem;
 }
 
+.reading-list-wrap {
+  max-height: 360px;
+  overflow: auto;
+  border: 2px solid rgba(0, 255, 255, 0.35);
+}
+
+.reading-list-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.reading-list-table th,
+.reading-list-table td {
+  border-bottom: 1px dotted rgba(0, 255, 255, 0.3);
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+}
+
+.reading-list-table th {
+  color: #9afcff;
+  background: rgba(0, 255, 255, 0.08);
+}
+
 @media (max-width: 768px) {
   .header h1 {
     font-size: 2.1rem;
@@ -572,6 +606,16 @@ textarea:focus {
 
   .custom-reading-grid {
     grid-template-columns: 1fr;
+  }
+
+  .login-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .reading-list-table th,
+  .reading-list-table td {
+    font-size: 0.9rem;
   }
 }
 

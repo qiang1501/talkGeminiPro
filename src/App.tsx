@@ -1,4 +1,5 @@
 ﻿import { useEffect, useState, useCallback, useRef } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import './App.css';
 import { KaraokeLineData, LineCompareResult } from './types';
 import { buildTokenizer, parseTextToLines } from './utils/textParser';
@@ -10,12 +11,15 @@ import {
   transliterateEnglishWords,
   type EnglishKatakanaMap,
 } from './utils/englishKatakana';
+import { supabaseClient, isSupabaseAuthConfigured } from './utils/supabaseClient';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 import { TextInputPanel } from './components/TextInputPanel';
 import { LivePreview } from './components/LivePreview';
 import { ScorePanel } from './components/ScorePanel';
 import { LineCompare } from './components/LineCompare';
 import { CustomReadingPanel } from './components/CustomReadingPanel';
+import { LoginPanel } from './components/LoginPanel';
+import { CustomReadingList, type CustomReadingItem } from './components/CustomReadingList';
 
 const AUTO_JUDGE_IDLE_MS = 5000;
 
@@ -36,6 +40,10 @@ function App() {
   const [lastLiveTextUpdateAt, setLastLiveTextUpdateAt] = useState<number | null>(null);
   const [englishReadings, setEnglishReadings] = useState<EnglishKatakanaMap>({});
   const [isCustomReadingPage, setIsCustomReadingPage] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
+  const [customReadingItems, setCustomReadingItems] = useState<CustomReadingItem[]>([]);
+  const [isCustomReadingLoading, setIsCustomReadingLoading] = useState(false);
+  const [customReadingError, setCustomReadingError] = useState<string | null>(null);
 
   const lastTranscriptRef = useRef('');
   const colorIndexRef = useRef(0);
@@ -63,6 +71,64 @@ function App() {
         setInitError(`初期化に失敗しました: ${e.message || String(e)}`);
         setIsInitializing(false);
       });
+  }, []);
+
+  const loadCustomReadings = useCallback(async () => {
+    if (!supabaseClient) {
+      setCustomReadingError('一覧取得の設定が未完了です。');
+      setCustomReadingItems([]);
+      return;
+    }
+
+    setIsCustomReadingLoading(true);
+    setCustomReadingError(null);
+    try {
+      const { data, error: selectError } = await supabaseClient
+        .from('custom_word_readings')
+        .select('word, reading_katakana, updated_at')
+        .order('updated_at', { ascending: false })
+        .limit(200);
+
+      if (selectError) {
+        throw new Error(selectError.message);
+      }
+
+      const mapped: CustomReadingItem[] = (data ?? []).map((row) => ({
+        word: row.word,
+        reading: row.reading_katakana,
+        updatedAt: row.updated_at,
+      }));
+      setCustomReadingItems(mapped);
+    } catch (e) {
+      setCustomReadingError(e instanceof Error ? e.message : '一覧取得に失敗しました。');
+      setCustomReadingItems([]);
+    } finally {
+      setIsCustomReadingLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isCustomReadingPage) return;
+    loadCustomReadings();
+  }, [isCustomReadingPage, loadCustomReadings]);
+
+  useEffect(() => {
+    if (!supabaseClient) return;
+
+    let mounted = true;
+    supabaseClient.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      setSession(data.session);
+    });
+
+    const { data: { subscription } } = supabaseClient.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const judgeLine = useCallback((lineIdx: number, textToJudge: string) => {
@@ -298,13 +364,43 @@ function App() {
   const error = initError || speechError;
 
   const handleSaveCustomReading = useCallback(async (word: string, reading: string) => {
-    await saveCustomReading(word, reading);
+    const token = session?.access_token;
+    if (!token) {
+      throw new Error('ログインが必要です。');
+    }
+
+    await saveCustomReading(word, reading, token);
     const key = normalizeEnglishWordKey(word);
     if (!key) return;
     setEnglishReadings((prev) => ({
       ...prev,
       [key]: reading,
     }));
+    await loadCustomReadings();
+  }, [session, loadCustomReadings]);
+
+  const handleLogin = useCallback(async (email: string) => {
+    if (!supabaseClient) {
+      throw new Error('Supabase Auth が未設定です。');
+    }
+
+    const redirectTo = `${window.location.origin}${import.meta.env.BASE_URL}`;
+    const { error: signInError } = await supabaseClient.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: redirectTo },
+    });
+
+    if (signInError) {
+      throw new Error(signInError.message);
+    }
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    if (!supabaseClient) return;
+    const { error: signOutError } = await supabaseClient.auth.signOut();
+    if (signOutError) {
+      throw new Error(signOutError.message);
+    }
   }, []);
 
   const toggleCustomReadingPage = useCallback(() => {
@@ -338,6 +434,7 @@ function App() {
   const handleReset = () => {
     advanceRecordingSession();
     stopRecognitionIfActive();
+    setIsCustomReadingPage(false);
     setParsedLines(null);
     setEnglishReadings({});
     setLineResults([]);
@@ -399,7 +496,7 @@ function App() {
       <header className="header">
         <div className="header-inner">
           <h1 onClick={handleReset} style={{ cursor: 'pointer', userSelect: 'none' }}>
-            日本語発音チェッカー
+            🗣️ 日本語発音チェッカー
           </h1>
           <button
             type="button"
@@ -416,7 +513,26 @@ function App() {
         {error && <div className="error-message">{error}</div>}
 
         {isCustomReadingPage ? (
-          <CustomReadingPanel onSave={handleSaveCustomReading} />
+          <>
+            <LoginPanel
+              isConfigured={isSupabaseAuthConfigured}
+              onLogin={handleLogin}
+              onLogout={handleLogout}
+              userEmail={session?.user?.email ?? null}
+            />
+            {session?.user ? (
+              <CustomReadingPanel onSave={handleSaveCustomReading} />
+            ) : (
+              <section className="panel custom-reading-panel">
+                <p className="custom-reading-help">読み方を追加するにはログインしてください。</p>
+              </section>
+            )}
+            <CustomReadingList
+              items={customReadingItems}
+              loading={isCustomReadingLoading}
+              error={customReadingError}
+            />
+          </>
         ) : (
           <>
             {!parsedLines && <TextInputPanel onAnalyze={handleAnalyze} isLoading={isInitializing} />}
