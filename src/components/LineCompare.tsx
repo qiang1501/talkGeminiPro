@@ -13,8 +13,6 @@ interface LineCompareProps {
 }
 
 export const LineCompare: React.FC<LineCompareProps> = ({ line, isActive, isRecording, isSparkling, sparkleColor, result, onToggleRecord }) => {
-  const isLineRecording = isActive && isRecording;
-
   return (
     <div 
       className={`line-compare-container ${isActive ? 'active-line' : ''} ${isActive && isSparkling ? 'sparkling' : ''}`}
@@ -42,11 +40,11 @@ export const LineCompare: React.FC<LineCompareProps> = ({ line, isActive, isReco
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
         <button 
-          className={isLineRecording ? "btn-record stop-btn" : "btn-record start-btn"} 
+          className={isRecording ? "btn-record stop-btn" : "btn-record start-btn"} 
           onClick={() => onToggleRecord(line.lineIndex)}
           style={{ padding: '0.5rem 1rem', fontSize: '1rem' }}
         >
-          {isLineRecording ? '🛑 STOP' : '🎤 REC'}
+          {isRecording ? '🛑 STOP' : '🎤 REC'}
         </button>
       </div>
     </div>
