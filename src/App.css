@@ -474,6 +474,64 @@ textarea:focus {
   text-shadow: 0 0 10px var(--neon-red);
 }
 
+.custom-reading-panel {
+  text-align: left;
+  margin-bottom: 2rem;
+}
+
+.custom-reading-panel h2 {
+  margin-top: 0;
+  color: #fff;
+  text-shadow: 0 0 10px var(--neon-blue);
+}
+
+.custom-reading-help {
+  color: #9afcff;
+  margin-bottom: 1rem;
+}
+
+.custom-reading-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 0.75rem;
+}
+
+.custom-reading-input {
+  background: #050505;
+  color: #fff;
+  border: 2px solid var(--neon-blue);
+  padding: 0.65rem 0.75rem;
+  font-size: 1rem;
+  font-family: var(--font-retro);
+}
+
+.custom-reading-input:focus {
+  outline: none;
+  border-color: #fff;
+  box-shadow: 0 0 12px var(--neon-blue);
+}
+
+.custom-reading-save {
+  padding: 0.65rem 1rem;
+  font-size: 1rem;
+}
+
+.custom-reading-message {
+  color: var(--neon-green);
+  margin-top: 0.75rem;
+}
+
+.custom-reading-error {
+  color: var(--neon-red);
+  margin-top: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .custom-reading-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Finish Action */
 .finish-action button {
   font-size: 2rem;

@@ -59,3 +59,18 @@ This app supports English words inside Japanese text by converting them into Kat
 3. Use `.env.example` as a template for local `.env`.
 
 If the Supabase endpoint is not configured or temporarily unavailable, the app automatically falls back to local transliteration rules.
+
+### Custom Word Reading Save
+
+Users can register custom readings from the web page.
+
+- Input: `Word` + `Reading`
+- Save destination: Supabase Edge Function `save-reading`
+- Persistence table: `public.custom_word_readings`
+- Lookup priority in transliteration:
+  1. `custom_word_readings` (user-registered)
+  2. built-in dictionary
+  3. heuristic fallback
+
+For local dev, you can set `VITE_SUPABASE_SAVE_READING_URL` explicitly.
+If omitted, the app derives it from `VITE_SUPABASE_TRANSLITERATE_URL`.

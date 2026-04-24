@@ -3,12 +3,19 @@ import './App.css';
 import { KaraokeLineData, LineCompareResult } from './types';
 import { buildTokenizer, parseTextToLines } from './utils/textParser';
 import { compareKanaStrings, getSpokenKanaStatuses } from './utils/diffMatcher';
-import { extractEnglishWords, transliterateEnglishWords, type EnglishKatakanaMap } from './utils/englishKatakana';
+import {
+  extractEnglishWords,
+  normalizeEnglishWordKey,
+  saveCustomReading,
+  transliterateEnglishWords,
+  type EnglishKatakanaMap,
+} from './utils/englishKatakana';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 import { TextInputPanel } from './components/TextInputPanel';
 import { LivePreview } from './components/LivePreview';
 import { ScorePanel } from './components/ScorePanel';
 import { LineCompare } from './components/LineCompare';
+import { CustomReadingPanel } from './components/CustomReadingPanel';
 
 const AUTO_JUDGE_IDLE_MS = 5000;
 
@@ -292,6 +299,16 @@ function App() {
 
   const error = initError || speechError;
 
+  const handleSaveCustomReading = useCallback(async (word: string, reading: string) => {
+    await saveCustomReading(word, reading);
+    const key = normalizeEnglishWordKey(word);
+    if (!key) return;
+    setEnglishReadings((prev) => ({
+      ...prev,
+      [key]: reading,
+    }));
+  }, []);
+
   const handleAnalyze = async (text: string) => {
     try {
       const englishWords = extractEnglishWords(text);
@@ -385,6 +402,7 @@ function App() {
 
       <main className="main-content">
         {error && <div className="error-message">{error}</div>}
+        <CustomReadingPanel onSave={handleSaveCustomReading} />
 
         {!parsedLines && (
           <TextInputPanel onAnalyze={handleAnalyze} isLoading={isInitializing} />

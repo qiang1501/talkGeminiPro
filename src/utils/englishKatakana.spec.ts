@@ -1,7 +1,9 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import {
+  buildSaveReadingEndpoint,
   extractEnglishWords,
   fallbackRomanToKatakana,
+  saveCustomReading,
   transliterateEnglishWords,
 } from './englishKatakana';
 
@@ -49,5 +51,36 @@ describe('transliterateEnglishWords', () => {
     const result = await transliterateEnglishWords(['Java', 'Web']);
     expect(result.java).toBe('ジャヴァ');
     expect(result.web).toBe('ウェブ');
+  });
+});
+
+describe('saveCustomReading', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it('derives save endpoint from transliterate endpoint', () => {
+    vi.stubEnv('VITE_SUPABASE_TRANSLITERATE_URL', 'https://example.com/functions/v1/transliterate');
+    expect(buildSaveReadingEndpoint()).toBe('https://example.com/functions/v1/save-reading');
+  });
+
+  it('posts custom reading to save API', async () => {
+    vi.stubEnv('VITE_SUPABASE_TRANSLITERATE_URL', 'https://example.com/functions/v1/transliterate');
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'test-anon-key');
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await saveCustomReading('AWS', 'エーダブリューエス');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe('https://example.com/functions/v1/save-reading');
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify({
+        word: 'AWS',
+        reading: 'エーダブリューエス',
+      }),
+    });
   });
 });

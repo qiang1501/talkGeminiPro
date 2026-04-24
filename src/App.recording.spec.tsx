@@ -176,9 +176,12 @@ const renderAnalyzedApp = async (text: string) => {
   render(<App />);
 
   const analyzeButton = await screen.findByRole('button', { name: /分析開始/i });
-  await user.type(screen.getByRole('textbox'), text);
+  await user.type(screen.getByPlaceholderText(/例：今日はとても暑いです。/i), text);
   await waitFor(() => expect(analyzeButton).toBeEnabled());
   await user.click(analyzeButton);
+  await waitFor(() => {
+    expect(document.querySelector('.line-compare-container')).not.toBeNull();
+  });
 
   return user;
 };

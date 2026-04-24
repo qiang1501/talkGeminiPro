@@ -207,6 +207,10 @@ function keyOfWord(word: string): string {
   return word.toLowerCase().replace(/[^a-z]/g, '');
 }
 
+export function normalizeEnglishWordKey(word: string): string {
+  return keyOfWord(word);
+}
+
 export function extractEnglishWords(text: string): string[] {
   const matches = text.match(ENGLISH_WORD_REGEX) ?? [];
   const uniqueByLower = new Map<string, string>();
@@ -340,6 +344,54 @@ export async function transliterateEnglishWords(words: string[]): Promise<Englis
     return merged;
   } catch {
     return fallback;
+  }
+}
+
+export function buildSaveReadingEndpoint(): string | null {
+  const explicit = import.meta.env.VITE_SUPABASE_SAVE_READING_URL as string | undefined;
+  if (explicit) return explicit;
+
+  const transliterateUrl = import.meta.env.VITE_SUPABASE_TRANSLITERATE_URL as string | undefined;
+  if (!transliterateUrl) return null;
+  if (!transliterateUrl.endsWith('/transliterate')) return null;
+  return transliterateUrl.replace(/\/transliterate$/, '/save-reading');
+}
+
+export async function saveCustomReading(word: string, reading: string): Promise<void> {
+  const endpoint = buildSaveReadingEndpoint();
+  if (!endpoint) {
+    throw new Error('Save Reading API endpoint is not configured.');
+  }
+
+  const key = normalizeEnglishWordKey(word);
+  if (!key) {
+    throw new Error('Word must contain alphabet letters.');
+  }
+
+  if (!reading.trim()) {
+    throw new Error('Reading is required.');
+  }
+
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (anonKey) {
+    headers.apikey = anonKey;
+    headers.Authorization = `Bearer ${anonKey}`;
+  }
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      word,
+      reading,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to save custom reading.');
   }
 }
 
