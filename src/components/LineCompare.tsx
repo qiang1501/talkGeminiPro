@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { KaraokeLineData, LineCompareResult } from '../types';
 import { RubyWord } from './RubyWord';
 
@@ -35,7 +35,6 @@ export const LineCompare: React.FC<LineCompareProps> = ({
         {line.words.map((w) => (
           <React.Fragment key={w.id}>
             <RubyWord word={w} isSpoken={false} />
-            {/* 句読点など、kuromojiでうまく分かれない場合のスペースなどがあれば補完（今回は不要） */}
           </React.Fragment>
         ))}
       </div>
@@ -58,14 +57,14 @@ export const LineCompare: React.FC<LineCompareProps> = ({
           style={{ padding: '0.5rem 1rem', fontSize: '1rem' }}
           aria-label="Read line aloud"
         >
-          🔊 再生
+          🔊 PLAY
         </button>
         <button 
           className={isRecording ? "btn-record stop-btn" : "btn-record start-btn"} 
           onClick={() => onToggleRecord(line.lineIndex)}
           style={{ padding: '0.5rem 1rem', fontSize: '1rem' }}
         >
-          {isRecording ? '🛑 STOP' : '🎤 REC'}
+          {isRecording ? '🔴 STOP' : '🎤 REC'}
         </button>
       </div>
     </div>
