@@ -27,7 +27,6 @@ function App() {
   const colorIndexRef = useRef(0);
   const recordingSessionIdRef = useRef(0);
   const pendingStartSessionIdRef = useRef<number | null>(null);
-  const requiresFreshInterimRef = useRef(false);
   const colors = ['var(--neon-blue)', 'var(--neon-pink)', 'var(--neon-green)', 'var(--neon-red)'];
 
   // We use a ref to hold the latest state because onFinalResult is a callback from the speech API listener
@@ -128,8 +127,6 @@ function App() {
 
     if (finished || !userRecording || !activelyRecording || activeRecordingLine === null) return;
     if (recordingSessionIdRef.current !== sessionIdAtRegistration) return;
-    if (requiresFreshInterimRef.current) return;
-
     setCurrentLineTranscript(prev => {
       if (recordingSessionIdRef.current !== sessionIdAtRegistration) {
         return prev;
@@ -167,10 +164,6 @@ function App() {
 
   // interimTranscriptの更新を監視してキラキラエフェクトを発火させる
   useEffect(() => {
-    if (recordingLineIndex !== null && interimTranscript !== '') {
-      requiresFreshInterimRef.current = false;
-    }
-
     if (interimTranscript !== lastTranscriptRef.current && interimTranscript !== '') {
       const nextIndex = (colorIndexRef.current + 1) % colors.length;
       colorIndexRef.current = nextIndex;
@@ -211,10 +204,9 @@ function App() {
     }
   }, [isRecording, isUserRecording, recordingLineIndex, start]);
 
-  const startRecordingForLine = useCallback((lineIdx: number, requireFreshInterim: boolean) => {
+  const startRecordingForLine = useCallback((lineIdx: number) => {
     const nextSessionId = advanceRecordingSession();
     pendingStartSessionIdRef.current = nextSessionId;
-    requiresFreshInterimRef.current = requireFreshInterim;
     setSelectedLineIndex(lineIdx);
     setRecordingLineIndex(lineIdx);
     setCurrentLineTranscript('');
@@ -224,7 +216,6 @@ function App() {
 
   const stopRecordingForLine = useCallback((lineIdx: number) => {
     advanceRecordingSession();
-    requiresFreshInterimRef.current = false;
     setIsUserRecording(false);
     setRecordingLineIndex(null);
     stop();
@@ -244,7 +235,7 @@ function App() {
     const { recordingLineIndex: activeRecordingLine } = stateRef.current;
 
     if (activeRecordingLine === null) {
-      startRecordingForLine(nextLineIndex, false);
+      startRecordingForLine(nextLineIndex);
       return;
     }
 
@@ -255,7 +246,7 @@ function App() {
     }
 
     stopRecordingForLine(activeRecordingLine);
-    startRecordingForLine(nextLineIndex, true);
+    startRecordingForLine(nextLineIndex);
   };
 
   const error = initError || speechError;
@@ -265,7 +256,6 @@ function App() {
       const lines = parseTextToLines(text);
       if (lines.length > 0) {
         advanceRecordingSession();
-        requiresFreshInterimRef.current = false;
         stopRecognitionIfActive();
         setParsedLines(lines);
         setLineResults([]);
@@ -283,7 +273,6 @@ function App() {
 
   const handleReset = () => {
     advanceRecordingSession();
-    requiresFreshInterimRef.current = false;
     stopRecognitionIfActive();
     setParsedLines(null);
     setLineResults([]);
@@ -297,7 +286,6 @@ function App() {
   const handleRetry = () => {
     const hasLines = Boolean(stateRef.current.parsedLines?.length);
     advanceRecordingSession();
-    requiresFreshInterimRef.current = false;
     stopRecognitionIfActive();
     setLineResults([]);
     setSelectedLineIndex(hasLines ? 0 : null);

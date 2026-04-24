@@ -26,6 +26,7 @@ const mockState = vi.hoisted(() => {
   let interimTranscript = '';
   let error: string | null = null;
   let finalHandler: ((text: string) => void) | null = null;
+  let previousFinalHandler: ((text: string) => void) | null = null;
   const listeners = new Set<() => void>();
 
   const notify = () => {
@@ -80,6 +81,7 @@ const mockState = vi.hoisted(() => {
       interimTranscript = '';
       error = null;
       finalHandler = null;
+      previousFinalHandler = null;
       listeners.clear();
       this.buildTokenizerMock.mockClear();
       this.parseTextToLinesMock.mockClear();
@@ -103,10 +105,16 @@ const mockState = vi.hoisted(() => {
       };
     },
     attachFinalHandler(handler: (text: string) => void) {
+      if (finalHandler && finalHandler !== handler) {
+        previousFinalHandler = finalHandler;
+      }
       finalHandler = handler;
     },
     emitFinal(text: string) {
       finalHandler?.(text);
+    },
+    emitPreviousSessionFinal(text: string) {
+      previousFinalHandler?.(text);
     },
     setInterim(text: string) {
       interimTranscript = text;
@@ -282,7 +290,7 @@ describe('App free line recording selection', () => {
     });
 
     await act(async () => {
-      mockState.emitFinal('alpha late');
+      mockState.emitPreviousSessionFinal('alpha late');
     });
 
     await user.click(getLineRecordButton('beta line'));
@@ -295,5 +303,43 @@ describe('App free line recording selection', () => {
     expect(getLineContainer('beta line')).not.toHaveTextContent('alpha late');
     expect(getLineSpokenResult('alpha line')).toHaveTextContent('alpha early');
     expect(getLineContainer('alpha line')).not.toHaveTextContent('alpha late');
+  });
+
+  it('accepts an immediate final on the new line while still ignoring a stale final from the previous session', async () => {
+    const user = await renderAnalyzedApp('alpha line\nbeta line');
+
+    await user.click(getLineRecordButton('alpha line'));
+
+    await act(async () => {
+      mockState.emitFinal('alpha early');
+    });
+    await act(async () => {
+      mockState.setInterim(' alpha tail');
+    });
+
+    await user.click(getLineRecordButton('beta line'));
+
+    await waitFor(() => {
+      expect(mockState.stopMock).toHaveBeenCalledTimes(1);
+      expect(mockState.startMock).toHaveBeenCalledTimes(2);
+      expect(getLineSpokenResult('alpha line')).toHaveTextContent('alpha early alpha tail');
+      expect(getLineRecordButton('beta line')).toHaveTextContent(/stop/i);
+    });
+
+    await act(async () => {
+      mockState.emitPreviousSessionFinal('alpha stale');
+      mockState.emitFinal('beta immediate');
+    });
+
+    await user.click(getLineRecordButton('beta line'));
+
+    await waitFor(() => {
+      expect(mockState.stopMock).toHaveBeenCalledTimes(2);
+      expect(getLineSpokenResult('beta line')).toHaveTextContent('beta immediate');
+    });
+
+    expect(getLineContainer('beta line')).not.toHaveTextContent('alpha stale');
+    expect(getLineSpokenResult('alpha line')).toHaveTextContent('alpha early alpha tail');
+    expect(getLineContainer('alpha line')).not.toHaveTextContent('alpha stale');
   });
 });
