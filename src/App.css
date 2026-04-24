@@ -297,7 +297,8 @@ rt {
 .live-preview {
   position: fixed;
   bottom: 24px;
-  right: 24px;
+  left: 50%;
+  transform: translateX(-50%);
   top: auto; /* Override previous top setting */
   background: rgba(0, 0, 0, 0.9);
   border: 2px solid var(--neon-pink);
