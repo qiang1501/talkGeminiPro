@@ -15,11 +15,19 @@ function buildWord(surface: string, reading: string): KaraokeWord {
 }
 
 describe('RubyWord', () => {
-  it('shows ruby reading for alphabetic tokens even when lengths match', () => {
+  it('shows katakana ruby reading for alphabetic tokens even when lengths match', () => {
     render(<RubyWord word={buildWord('AWS', 'アウス')} />);
 
     const ruby = screen.getByText('AWS').closest('ruby');
     expect(ruby).not.toBeNull();
-    expect(screen.getByText('あうす')).toBeInTheDocument();
+    expect(screen.getByText('アウス')).toBeInTheDocument();
+  });
+
+  it('shows hiragana ruby reading for kanji tokens', () => {
+    render(<RubyWord word={buildWord('意識', 'イシキ')} />);
+
+    const ruby = screen.getByText('意識').closest('ruby');
+    expect(ruby).not.toBeNull();
+    expect(screen.getByText('いしき')).toBeInTheDocument();
   });
 });

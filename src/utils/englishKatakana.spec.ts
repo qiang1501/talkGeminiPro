@@ -3,6 +3,7 @@ import {
   buildSaveReadingEndpoint,
   extractEnglishWords,
   fallbackRomanToKatakana,
+  normalizeEnglishWordKey,
   saveCustomReading,
   transliterateEnglishWords,
 } from './englishKatakana';
@@ -11,6 +12,18 @@ describe('extractEnglishWords', () => {
   it('extracts unique english words from mixed Japanese text', () => {
     const words = extractEnglishWords('JavaとWebを学ぶ。JAVA + TypeScript + web');
     expect(words).toEqual(['Java', 'Web', 'TypeScript']);
+  });
+
+  it('keeps trailing digits for certification names like N1', () => {
+    const words = extractEnglishWords('JLPT N1 と AZ-900');
+    expect(words).toEqual(['JLPT', 'N1', 'AZ900']);
+  });
+});
+
+describe('normalizeEnglishWordKey', () => {
+  it('keeps digits when building dictionary keys', () => {
+    expect(normalizeEnglishWordKey('N1')).toBe('n1');
+    expect(normalizeEnglishWordKey('AZ-900')).toBe('az900');
   });
 });
 

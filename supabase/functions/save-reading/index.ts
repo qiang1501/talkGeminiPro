@@ -8,7 +8,11 @@ const CORS_HEADERS = {
 };
 
 function normalizeWord(word: string): string {
-  return word.toLowerCase().replace(/[^a-z]/g, '');
+  return word
+    .normalize('NFKC')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\-_'’`".,\\/]+/g, '');
 }
 
 function createAdminClient() {
@@ -74,7 +78,7 @@ Deno.serve(async (req) => {
     const wordKey = normalizeWord(word);
 
     if (!wordKey) {
-      return new Response(JSON.stringify({ error: 'word must include alphabet letters' }), {
+      return new Response(JSON.stringify({ error: 'word is required' }), {
         status: 400,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       });

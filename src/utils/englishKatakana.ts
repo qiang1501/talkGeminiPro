@@ -1,5 +1,16 @@
 export type EnglishKatakanaMap = Record<string, string>;
 
+export type ReadingDictionaryEntry = {
+  key: string;
+  word: string;
+  reading: string;
+};
+
+export type ReadingDictionary = {
+  byKey: EnglishKatakanaMap;
+  entries: ReadingDictionaryEntry[];
+};
+
 const INLINE_DICTIONARY: EnglishKatakanaMap = {
   java: 'ジャバ',
   web: 'ウェブ',
@@ -10,7 +21,7 @@ const INLINE_DICTIONARY: EnglishKatakanaMap = {
   react: 'リアクト',
 };
 
-const ENGLISH_WORD_REGEX = /[A-Za-z][A-Za-z'-]*/g;
+const ENGLISH_WORD_REGEX = /[A-Za-z][A-Za-z0-9'-]*/g;
 
 const THREE_CHAR_MAP: Record<string, string> = {
   tch: 'ッチ',
@@ -203,8 +214,16 @@ const FINAL_CONSONANT_MAP: Record<string, string> = {
   z: 'ズ',
 };
 
-function keyOfWord(word: string): string {
+function romanKeyOfWord(word: string): string {
   return word.toLowerCase().replace(/[^a-z]/g, '');
+}
+
+function keyOfWord(word: string): string {
+  return word
+    .normalize('NFKC')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\-_'’`".,\\/]+/g, '');
 }
 
 export function normalizeEnglishWordKey(word: string): string {
@@ -226,7 +245,7 @@ export function extractEnglishWords(text: string): string[] {
 }
 
 export function fallbackRomanToKatakana(word: string): string {
-  const key = keyOfWord(word);
+  const key = romanKeyOfWord(word);
   if (!key) return '';
   if (INLINE_DICTIONARY[key]) return INLINE_DICTIONARY[key];
 
@@ -402,4 +421,46 @@ export function getEnglishKatakanaReading(surface: string, englishMap: EnglishKa
   const key = keyOfWord(surface);
   if (!key) return null;
   return englishMap[key] ?? null;
+}
+
+export function buildReadingDictionary(
+  rows: Array<{ word?: string | null; reading?: string | null; reading_katakana?: string | null }>,
+): ReadingDictionary {
+  const byKey: EnglishKatakanaMap = {};
+  const entryByKey = new Map<string, ReadingDictionaryEntry>();
+
+  for (const row of rows) {
+    const word = row.word?.trim() ?? '';
+    const reading = (row.reading ?? row.reading_katakana ?? '').trim();
+    const key = keyOfWord(word);
+    if (!word || !reading || !key) continue;
+
+    byKey[key] = reading;
+    entryByKey.set(key, { key, word, reading });
+  }
+
+  const entries = [...entryByKey.values()].sort((a, b) => b.word.length - a.word.length);
+  return { byKey, entries };
+}
+
+export function dictionaryFromEnglishMap(map: EnglishKatakanaMap): ReadingDictionary {
+  const entries = Object.entries(map)
+    .map(([key, reading]) => ({ key, word: key, reading }))
+    .sort((a, b) => b.word.length - a.word.length);
+  return { byKey: map, entries };
+}
+
+export function mergeReadingDictionaries(...dictionaries: ReadingDictionary[]): ReadingDictionary {
+  const byKey: EnglishKatakanaMap = {};
+  const entryByKey = new Map<string, ReadingDictionaryEntry>();
+
+  for (const dictionary of dictionaries) {
+    Object.assign(byKey, dictionary.byKey);
+    for (const entry of dictionary.entries) {
+      entryByKey.set(entry.key, entry);
+    }
+  }
+
+  const entries = [...entryByKey.values()].sort((a, b) => b.word.length - a.word.length);
+  return { byKey, entries };
 }

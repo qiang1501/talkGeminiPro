@@ -73,11 +73,15 @@ const ROMAN_TO_KATAKANA: Array<[RegExp, string]> = [
 ];
 
 function normalizeWord(word: string): string {
-  return word.toLowerCase().replace(/[^a-z]/g, '');
+  return word
+    .normalize('NFKC')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\-_'’`".,\\/]+/g, '');
 }
 
 function heuristicKatakana(word: string): string {
-  let result = normalizeWord(word);
+  let result = word.toLowerCase().replace(/[^a-z]/g, '');
   if (!result) return '';
   for (const [pattern, replacement] of ROMAN_TO_KATAKANA) {
     result = result.replace(pattern, replacement);

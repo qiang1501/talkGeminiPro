@@ -1,96 +1,102 @@
-# 日本語カラオケ発音チェッカー (Japanese Karaoke Pronunciation Checker)
+﻿# 日本語発音チェッカー (Japanese Karaoke Pronunciation Checker)
 
-このアプリケーションは、React + Vite + TypeScript で作成された「カラオケ形式の日本語発声・採点システム」です。
+React + Vite + TypeScript で作成した、日本語の音読練習アプリです。
 
-## 概要
-ユーザーが入力した日本語テキストを `kuromoji.js` で形態素解析して単語に分割し、ブラウザの `Web Speech API` を使用して音声を認識します。認識された音声も再度形態素解析され、システムによって「文字での完全一致」で単語ごとに厳密に採点されます。
+- 入力した文章を行ごとに分割して表示
+- `REC` で行単位の発話を録音して採点
+- 発話結果と正解を比較して可視化
+- 英単語のカタカナ変換（Supabase Function + ローカルフォールバック）
+- カスタム読み方登録（Supabase 保存）
+- `PLAY` ボタンで読み上げ（Azure TTS優先 / ブラウザTTSフォールバック）
 
-## 特徴とこだわりのポイント！
-- **勝手な推測を行わない**: Web Speech API の「確定結果 (`isFinal=true`)」のみを使い、その発声から得られた読みのカタカナ配列と、対象単語の読みの配列を厳密に比較します。文脈的な推測や類似音の部分一致はすべて不正解（赤）として扱います。
-- **カラオケ進行**: 正解しても不正解でも次の単語へ判定枠が遷移していくカラオケ形式を採用しています。
-- **ライブ表示**: 音声認識中の「暫定結果 (`interim`)」については、現在認識されている雰囲気を表現するために画面下部に表示しますが、採点ロジックとは完全に分離しています。
-- **フロントエンド完結**: 形態素解析辞書のロードも含め、サーバーのバックエンド実装なしでブラウザ上で完結します。GitHub Pages等の静的ホスティングで動作します。
+公開URL:
+- https://qiang1501.github.io/talkGeminiPro/
 
-## デモ
-本プロジェクトは GitHub Pages にデプロイされています。以下のリンクからすぐにお試しいただけます：
-👉 **[デモページを開く](https://qiang1501.github.io/talkGeminiPro/)**
+## 必要環境
 
-## セットアップ手順
-ローカルで開発を行う場合は、Node.js (LTS 推奨) がインストールされている環境で実行してください。
+- Node.js (LTS 推奨)
+- npm
 
-1. **依存パッケージのインストール**
-   ```bash
-   npm install
-   ```
+## ローカル起動
 
-2. **辞書データの配置**
-   `kuromoji` をブラウザで利用するため、モジュール内の辞書データを `public/` フォルダにコピーする必要があります。プロジェクトのルートで以下のコマンドを実行してください。
-   
-   - Windows (PowerShell) の場合:
-     ```powershell
-     mkdir public/dict; Copy-Item -Path .\node_modules\kuromoji\dict\* -Destination .\public\dict\
-     ```
-   - Mac / Linux (Bash) の場合:
-     ```bash
-     mkdir -p public/dict && cp node_modules/kuromoji/dict/* public/dict/
-     ```
+1. 依存関係をインストール
 
-3. **ローカルサーバーの起動**
-   ```bash
-   npm run dev
-   ```
-   ブラウザで表示されたURL（例: `http://localhost:5173/talkGeminiPro/`）にアクセスしてください。
+```bash
+npm install
+```
 
-## ブラウザ制限
-- 音声認識には `Web Speech API` を利用しているため、対応しているブラウザ（主に Google Chrome や MS Edge 最新版）でご利用ください。
-- マイクの許可を求められた場合は「許可」を選択してください。
-- 各行の `REC` は任意の順で選択できます。録音中に別の行へ切り替えると、先に前の行を判定してから新しい行の録音を開始します。
+2. kuromoji 辞書を `public/dict` にコピー
 
-## English Word Transliteration (GitHub Pages + Supabase)
+Windows (PowerShell):
 
-This app supports English words inside Japanese text by converting them into Katakana readings.
+```powershell
+mkdir public/dict
+Copy-Item -Path .\node_modules\kuromoji\dict\* -Destination .\public\dict\
+```
 
-1. Deploy Supabase Edge Function:
-   - Path in this repo: `supabase/functions/transliterate/index.ts`
-   - Deploy command example: `supabase functions deploy transliterate`
-2. Set frontend environment variables (for Vite):
-   - `VITE_SUPABASE_TRANSLITERATE_URL`
-   - `VITE_SUPABASE_ANON_KEY` (optional but recommended)
-3. Use `.env.example` as a template for local `.env`.
+Mac / Linux (Bash):
 
-If the Supabase endpoint is not configured or temporarily unavailable, the app automatically falls back to local transliteration rules.
+```bash
+mkdir -p public/dict && cp node_modules/kuromoji/dict/* public/dict/
+```
 
-### Custom Word Reading Save
+3. 開発サーバー起動
 
-Users can register custom readings from the web page.
+```bash
+npm run dev
+```
 
-- Input: `Word` + `Reading`
-- Save destination: Supabase Edge Function `save-reading`
-- Persistence table: `public.custom_word_readings`
-- Lookup priority in transliteration:
-  1. `custom_word_readings` (user-registered)
-  2. built-in dictionary
-  3. heuristic fallback
+## 環境変数
 
-For local dev, you can set `VITE_SUPABASE_SAVE_READING_URL` explicitly.
-If omitted, the app derives it from `VITE_SUPABASE_TRANSLITERATE_URL`.
+`.env.example` をコピーして `.env` を作成してください。
 
-### Azure TTS (Recommended Playback)
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_TRANSLITERATE_URL`
+- `VITE_SUPABASE_SAVE_READING_URL`
+- `VITE_SUPABASE_AZURE_TTS_URL`
+- `VITE_SUPABASE_ANON_KEY`
 
-The line playback button can use Azure AI Speech via Supabase Edge Function.
-The browser `speechSynthesis` remains as a fallback.
+## Supabase Functions
 
-1. Deploy Edge Function:
-   - Path: `supabase/functions/azure-tts/index.ts`
-   - Command: `supabase functions deploy azure-tts`
-2. Set Supabase function secrets:
-   - `AZURE_SPEECH_KEY`
-   - `AZURE_SPEECH_REGION` (example: `westus`)
-   - Optional: `AZURE_SPEECH_VOICE` (default: `ja-JP-NanamiNeural`)
-3. Set frontend env:
-   - `VITE_SUPABASE_AZURE_TTS_URL`
-   - If omitted, frontend derives endpoint from `VITE_SUPABASE_TRANSLITERATE_URL` by replacing `/transliterate` with `/azure-tts`.
+### 1) Transliterate
 
-Security note:
-- Never place `AZURE_SPEECH_KEY` in frontend code or `.env` for Vite.
-- Keep it only in Supabase Function Secrets.
+英単語をカタカナへ変換します。
+
+- パス: `supabase/functions/transliterate/index.ts`
+- 例: `supabase functions deploy transliterate`
+
+### 2) Save Reading
+
+カスタム読み方を保存します。
+
+- パス: `supabase/functions/save-reading/index.ts`
+- 例: `supabase functions deploy save-reading`
+
+### 3) Azure TTS
+
+`PLAY` ボタンの読み上げ用 API です。
+
+- パス: `supabase/functions/azure-tts/index.ts`
+- 例: `supabase functions deploy azure-tts`
+
+必要な Supabase Secret:
+
+- `AZURE_SPEECH_KEY`
+- `AZURE_SPEECH_REGION` (例: `westus`)
+- `AZURE_SPEECH_VOICE` (任意、既定: `ja-JP-NanamiNeural`)
+
+## セキュリティ注意
+
+- `AZURE_SPEECH_KEY` をフロントエンドに置かないでください。
+- Azureキーは Supabase Function Secrets のみで管理してください。
+- キーを公開場所に貼った場合はローテーションしてください。
+
+## デプロイ
+
+GitHub Actions (`.github/workflows/deploy.yml`) で GitHub Pages へデプロイします。
+
+```bash
+git push origin main
+```
+
+push 後に Actions が走り、公開サイトが更新されます。

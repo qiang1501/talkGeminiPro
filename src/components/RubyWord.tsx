@@ -45,7 +45,7 @@ export const RubyWord: React.FC<RubyWordProps> = ({ word, isSpoken }) => {
     });
   } else {
     // Original text (no status)
-    rubyElements = hiraganaReading;
+    rubyElements = hasKanji ? hiraganaReading : word.reading;
   }
 
   // あなたの声の場合のベーステキストの色

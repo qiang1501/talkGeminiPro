@@ -6,11 +6,14 @@ import { buildTokenizer, parseTextToLines } from './utils/textParser';
 import { compareKanaStrings, getSpokenKanaStatuses } from './utils/diffMatcher';
 import { synthesizeAzureSpeech } from './utils/azureTts';
 import {
+  buildReadingDictionary,
+  dictionaryFromEnglishMap,
   extractEnglishWords,
+  mergeReadingDictionaries,
   normalizeEnglishWordKey,
   saveCustomReading,
   transliterateEnglishWords,
-  type EnglishKatakanaMap,
+  type ReadingDictionary,
 } from './utils/englishKatakana';
 import { supabaseClient, isSupabaseAuthConfigured } from './utils/supabaseClient';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
@@ -44,7 +47,7 @@ function App() {
   const [sparkleColor, setSparkleColor] = useState('var(--neon-blue)');
   const [recordingSessionToken, setRecordingSessionToken] = useState(0);
   const [lastLiveTextUpdateAt, setLastLiveTextUpdateAt] = useState<number | null>(null);
-  const [englishReadings, setEnglishReadings] = useState<EnglishKatakanaMap>({});
+  const [englishReadings, setEnglishReadings] = useState<ReadingDictionary>(() => dictionaryFromEnglishMap({}));
   const [isCustomReadingPage, setIsCustomReadingPage] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [customReadingItems, setCustomReadingItems] = useState<CustomReadingItem[]>([]);
@@ -96,7 +99,7 @@ function App() {
         .from('custom_word_readings')
         .select('word, reading_katakana, updated_at')
         .order('updated_at', { ascending: false })
-        .limit(200);
+        .limit(500);
 
       if (selectError) {
         throw new Error(selectError.message);
@@ -381,12 +384,34 @@ function App() {
     await saveCustomReading(word, reading, token);
     const key = normalizeEnglishWordKey(word);
     if (!key) return;
-    setEnglishReadings((prev) => ({
-      ...prev,
-      [key]: reading,
-    }));
+    const savedDictionary = buildReadingDictionary([{ word, reading }]);
+    setEnglishReadings((prev) => mergeReadingDictionaries(prev, savedDictionary));
     await loadCustomReadings();
   }, [session, loadCustomReadings]);
+
+  const loadReadingDictionary = useCallback(async (text: string): Promise<ReadingDictionary> => {
+    const englishWords = extractEnglishWords(text);
+    const fallbackDictionary = dictionaryFromEnglishMap(await transliterateEnglishWords(englishWords));
+
+    if (!supabaseClient) {
+      return fallbackDictionary;
+    }
+
+    try {
+      const { data, error: selectError } = await supabaseClient
+        .from('custom_word_readings')
+        .select('word, reading_katakana');
+
+      if (selectError) {
+        return fallbackDictionary;
+      }
+
+      const dbDictionary = buildReadingDictionary(data ?? []);
+      return mergeReadingDictionaries(fallbackDictionary, dbDictionary);
+    } catch {
+      return fallbackDictionary;
+    }
+  }, []);
 
   const handleLogin = useCallback(async (email: string) => {
     if (!supabaseClient) {
@@ -418,8 +443,7 @@ function App() {
 
   const handleAnalyze = async (text: string) => {
     try {
-      const englishWords = extractEnglishWords(text);
-      const convertedReadings = await transliterateEnglishWords(englishWords);
+      const convertedReadings = await loadReadingDictionary(text);
       const lines = parseTextToLines(text, convertedReadings);
       if (lines.length > 0) {
         advanceRecordingSession();
@@ -445,7 +469,7 @@ function App() {
     stopRecognitionIfActive();
     setIsCustomReadingPage(false);
     setParsedLines(null);
-    setEnglishReadings({});
+    setEnglishReadings(dictionaryFromEnglishMap({}));
     setLineResults([]);
     setSelectedLineIndex(null);
     setRecordingLineIndex(null);
