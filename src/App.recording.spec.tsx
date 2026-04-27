@@ -34,30 +34,35 @@ const mockState = vi.hoisted(() => {
     listeners.forEach((listener) => listener());
   };
 
-  const buildLines = (text: string): MockLine[] =>
-    text
+  const buildWordLines = (text: string): MockLine[] => {
+    const wordsByLine = text
       .split('\n')
       .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line, lineIndex) => ({
+      .filter(Boolean);
+
+    return wordsByLine.map((line, lineIndex) => {
+      const reading = line === 'N1' ? 'エヌワン' : line;
+      return {
         lineIndex,
         originalText: line,
-        originalKana: line,
+        originalKana: reading,
         words: [
           {
             id: `${lineIndex}-0`,
             surface: line,
-            reading: line,
+            reading,
             status: 'pending' as const,
             lineIndex,
             wordIndex: 0,
           },
         ],
-      }));
+      };
+    });
+  };
 
   return {
     buildTokenizerMock: vi.fn(() => Promise.resolve()),
-    parseTextToLinesMock: vi.fn((text: string) => buildLines(text)),
+    parseTextToLinesMock: vi.fn((text: string) => buildWordLines(text)),
     compareKanaStringsMock: vi.fn((targetKana: string, spokenKana: string) =>
       targetKana.split('').map((char, index) => ({
         char,
@@ -442,6 +447,9 @@ describe('App free line recording selection', () => {
     });
 
     expect(document.querySelector('.score-panel')).not.toBeNull();
+    expect(screen.getByRole('button', {
+      name: /間違えた単語をもう一度練習する/,
+    })).toBeInTheDocument();
 
     await act(async () => {
       mockState.emitOnEnd();
@@ -471,4 +479,33 @@ describe('App free line recording selection', () => {
 
     expect(getLineRecordButton('alpha line')).toHaveTextContent(/rec/i);
   }, 12000);
+
+  it('starts a new practice session from the mistaken words after scoring', async () => {
+    const user = await renderAnalyzedApp('N1\n意識');
+
+    await user.click(getLineRecordButton('N1'));
+    await act(async () => {
+      mockState.emitFinal('wrong');
+    });
+    await user.click(getLineRecordButton('N1'));
+
+    await waitFor(() => {
+      expect(getLineSpokenResult('N1')).toHaveTextContent('wrong');
+    });
+
+    await user.click(getFinishButton());
+
+    const retryMistakesButton = await screen.findByRole('button', {
+      name: /間違えた単語をもう一度練習する/,
+    });
+    await user.click(retryMistakesButton);
+
+    await waitFor(() => {
+      expect(mockState.parseTextToLinesMock).toHaveBeenLastCalledWith(
+        'N1',
+        expect.any(Object),
+      );
+      expect(screen.getByText('N1')).toBeInTheDocument();
+    });
+  });
 });

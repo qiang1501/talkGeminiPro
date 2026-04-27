@@ -17,6 +17,7 @@ import {
 } from './utils/englishKatakana';
 import { supabaseClient, isSupabaseAuthConfigured } from './utils/supabaseClient';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
+import { extractMistakeWords, type MistakeWord } from './utils/mistakeWords';
 import { TextInputPanel } from './components/TextInputPanel';
 import { LivePreview } from './components/LivePreview';
 import { ScorePanel } from './components/ScorePanel';
@@ -37,6 +38,7 @@ function App() {
   const [initError, setInitError] = useState<string | null>(null);
   const [parsedLines, setParsedLines] = useState<KaraokeLineData[] | null>(null);
   const [lineResults, setLineResults] = useState<LineCompareResult[]>([]);
+  const [mistakeWords, setMistakeWords] = useState<MistakeWord[]>([]);
 
   const [selectedLineIndex, setSelectedLineIndex] = useState<number | null>(null);
   const [recordingLineIndex, setRecordingLineIndex] = useState<number | null>(null);
@@ -145,16 +147,16 @@ function App() {
 
   const judgeLine = useCallback((lineIdx: number, textToJudge: string) => {
     const { parsedLines: currentLines, lineResults: results, englishReadings: currentEnglishReadings } = stateRef.current;
-    if (!currentLines || lineIdx >= currentLines.length) return;
+    if (!currentLines || lineIdx >= currentLines.length) return null;
 
     if (!textToJudge.trim()) {
       const filteredResults = results.filter((r) => r.lineIndex !== lineIdx);
       setLineResults(filteredResults);
-      return;
+      return null;
     }
 
     const spokenLines = parseTextToLines(textToJudge, currentEnglishReadings);
-    if (spokenLines.length === 0) return;
+    if (spokenLines.length === 0) return null;
 
     const spokenLine = spokenLines[0];
     const spokenKana = spokenLine.originalKana;
@@ -198,6 +200,7 @@ function App() {
 
     const filteredResults = results.filter((r) => r.lineIndex !== lineIdx);
     setLineResults([...filteredResults, newResult]);
+    return newResult;
   }, []);
 
   const advanceRecordingSession = useCallback(() => {
@@ -451,6 +454,7 @@ function App() {
         setEnglishReadings(convertedReadings);
         setParsedLines(lines);
         setLineResults([]);
+        setMistakeWords([]);
         setSelectedLineIndex(null);
         setRecordingLineIndex(null);
         setCurrentLineTranscript('');
@@ -471,6 +475,7 @@ function App() {
     setParsedLines(null);
     setEnglishReadings(dictionaryFromEnglishMap({}));
     setLineResults([]);
+    setMistakeWords([]);
     setSelectedLineIndex(null);
     setRecordingLineIndex(null);
     setCurrentLineTranscript('');
@@ -483,6 +488,7 @@ function App() {
     advanceRecordingSession();
     stopRecognitionIfActive();
     setLineResults([]);
+    setMistakeWords([]);
     setSelectedLineIndex(null);
     setRecordingLineIndex(null);
     setCurrentLineTranscript('');
@@ -499,6 +505,7 @@ function App() {
       isRecording: activelyRecording,
     } = stateRef.current;
 
+    let nextResults = stateRef.current.lineResults;
     if (activeRecordingLine !== null || userRecording || activelyRecording) {
       const finalFullText = accumulatedTranscript + interimTranscript;
 
@@ -510,12 +517,25 @@ function App() {
       stop();
 
       if (activeRecordingLine !== null) {
-        judgeLine(activeRecordingLine, finalFullText);
+        const activeResult = judgeLine(activeRecordingLine, finalFullText);
+        if (activeResult) {
+          nextResults = [
+            ...nextResults.filter((result) => result.lineIndex !== activeRecordingLine),
+            activeResult,
+          ];
+        }
       }
     }
 
+    setMistakeWords(extractMistakeWords(stateRef.current.parsedLines ?? [], nextResults));
     setIsFinished(true);
   }, [advanceRecordingSession, interimTranscript, judgeLine, stop]);
+
+  const handlePracticeMistakes = useCallback(async () => {
+    if (mistakeWords.length === 0) return;
+    const practiceText = mistakeWords.map((word) => word.surface).join('\n');
+    await handleAnalyze(practiceText);
+  }, [mistakeWords]);
 
   const stopCurrentPlayback = useCallback(() => {
     const audio = playbackAudioRef.current;
@@ -689,6 +709,8 @@ function App() {
                 correctChars={correctScoreChars}
                 onReset={handleReset}
                 onRetry={handleRetry}
+                onPracticeMistakes={handlePracticeMistakes}
+                mistakeWordCount={mistakeWords.length}
               />
             )}
           </>
